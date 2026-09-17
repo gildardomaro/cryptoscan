@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CryptoGuard AML Scanner | Escáner Forense Multi-Blockchain</title>
+    <meta name="description" content="Escáner y auditoría de riesgo AML para billeteras de Bitcoin, Ethereum, TRON, Solana, BNB y Polygon.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- html2pdf.js para exportación directa a PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-background">
+        <div class="glow-orb orb-1"></div>
+        <div class="glow-orb orb-2"></div>
+    </div>
+
+    <header class="app-header">
+        <div class="header-container">
+            <div class="brand">
+                <div class="brand-icon">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div class="brand-text">
+                    <h1>CryptoGuard <span>AML</span></h1>
+                    <span class="badge-tag">Multi-Chain Forensic v2.4</span>
+                </div>
+            </div>
+
+            <div class="header-status">
+                <span class="live-dot"></span>
+                <span class="status-text">Base de datos de sanciones y OFAC activa</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <!-- Panel de Entrada de Búsqueda -->
+        <section class="search-section">
+            <div class="section-title">
+                <h2>Auditoría de Riesgo y Origen de Fondos</h2>
+                <p>Verifica si una billetera está vinculada a lavado de dinero, estafas, mezcladores o sanciones internacionales.</p>
+            </div>
+
+            <div class="search-card">
+                <form id="scanner-form" class="search-form" onsubmit="handleScan(event)">
+                    <div class="network-selector-wrapper">
+                        <label for="network-select">Red Blockchain</label>
+                        <div class="custom-select">
+                            <select id="network-select" onchange="handleNetworkChange()">
+                                <option value="auto">⚡ Auto-detectar Red</option>
+                                <option value="tron">🔴 TRON (TRX / USDT TRC-20)</option>
+                                <option value="ethereum">🔵 Ethereum (ETH / ERC-20)</option>
+                                <option value="bitcoin">🟠 Bitcoin (BTC)</option>
+                                <option value="solana">🟣 Solana (SOL / SPL)</option>
+                                <option value="bsc">🟡 BNB Chain (BNB / BEP-20)</option>
+                                <option value="polygon">🔷 Polygon (POL)</option>
+                            </select>
+                            <i class="fa-solid fa-chevron-down select-arrow"></i>
+                        </div>
+                    </div>
+
+                    <div class="input-address-wrapper">
+                        <label for="wallet-input">Dirección Pública de la Billetera</label>
+                        <div class="input-with-actions">
+                            <i class="fa-solid fa-magnifying-glass input-icon"></i>
+                            <input 
+                                type="text" 
+                                id="wallet-input" 
+                                placeholder="Ej: TTzxFKX8bzBoBZ2jatrUUYKZJ67Cyvi6G6 o 0x71C... o bc1..." 
+                                spellcheck="false"
+                                autocomplete="off"
+                                required
+                            >
+                            <button type="button" class="btn-paste" onclick="pasteFromClipboard()" title="Pegar del portapapeles">
+                                <i class="fa-regular fa-clipboard"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btn-submit-scan" class="btn-scan">
+                        <span class="btn-text"><i class="fa-solid fa-radar"></i> Escanear Billetera</span>
+                        <span class="btn-loading" style="display: none;"><i class="fa-solid fa-circle-notch fa-spin"></i> Auditando...</span>
+                    </button>
+                </form>
+
+                <!-- Demos rápidas de prueba -->
+                <div class="quick-demos">
+                    <span class="quick-label">Prueba con billeteras ejemplo:</span>
+                    <div class="quick-buttons">
+                        <button type="button" class="btn-chip chip-danger" onclick="loadSample('tron-illicit')">
+                            <i class="fa-solid fa-triangle-exclamation"></i> TRON Alto Riesgo (80%)
+                        </button>
+                        <button type="button" class="btn-chip chip-warning" onclick="loadSample('eth-mixer')">
+                            <i class="fa-solid fa-shuffle"></i> Ethereum Mixer / Tornado (65%)
+                        </button>
+                        <button type="button" class="btn-chip chip-success" onclick="loadSample('binance-clean')">
+                            <i class="fa-solid fa-circle-check"></i> Binance Cold Wallet (1% Seguro)
+                        </button>
+                        <button type="button" class="btn-chip chip-clean" onclick="loadSample('btc-clean')">
+                            <i class="fa-brands fa-bitcoin"></i> Bitcoin Verificada (4%)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Loader State -->
+        <section id="scanning-progress" class="scanning-progress" style="display: none;">
+            <div class="spinner-container">
+                <div class="radar-pulse"></div>
+                <i class="fa-solid fa-shield-virus progress-icon"></i>
+            </div>
+            <h3 id="progress-step-title">Inspeccionando bloques y libros contables...</h3>
+            <p id="progress-step-desc">Cruzando transacciones con listas negras internacionales (OFAC, Interpol, Chainalysis)...</p>
+            <div class="progress-bar-container">
+                <div id="progress-bar-fill" class="progress-bar-fill"></div>
+            </div>
+        </section>
+
+        <!-- Tarjeta de Resultados (Inspirada fielmente en la imagen) -->
+        <section id="result-card-container" class="result-container" style="display: none;">
+            <div class="report-wrapper">
+                
+                <!-- Encabezado del Reporte con Icono de Alerta -->
+                <div class="report-header" id="report-header-banner">
+                    <div class="report-status-badge" id="report-status-badge">
+                        <div class="status-icon-bubble" id="status-icon-bubble">
+                            <i class="fa-solid fa-circle-xmark" id="status-main-icon"></i>
+                        </div>
+                        <div class="status-title-group">
+                            <h2 id="report-main-title">Resultado del Análisis</h2>
+                            <span id="report-subtitle" class="report-subtitle">Detección de Actividad de Riesgo</span>
+                        </div>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn-action-icon" onclick="copyReportLink()" title="Copiar enlace del reporte"><i class="fa-solid fa-share-nodes"></i></button>
+                        <button class="btn-export-pdf-top" onclick="exportReportToPDF()" title="Descargar reporte en PDF">
+                            <i class="fa-solid fa-file-pdf"></i> <span>Exportar PDF</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Detalles de la Billetera -->
+                <div class="address-metadata-block">
+                    <div class="meta-row address-row">
+                        <span class="meta-label">Dirección:</span>
+                        <div class="address-copy-box">
+                            <span class="address-text" id="res-address">TTzxFKX8bzBoBZ2jatrUUYKZJ67Cyvi6G6</span>
+                            <button class="btn-copy-address" onclick="copyAddress()" title="Copiar dirección">
+                                <i class="fa-regular fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Red Blockchain:</span>
+                        <span class="meta-value chain-badge" id="res-network">TRON Network (TRC-20)</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Fecha de Análisis:</span>
+                        <span class="meta-value mono-text" id="res-date">--/--/---- --:--:--</span>
+                    </div>
+                </div>
+
+                <!-- Balances duales (Snapshot AML y Balance en Vivo On-Chain) -->
+                <div class="balances-section">
+                    <div class="section-subheading">
+                        <i class="fa-solid fa-wallet"></i> Balances:
+                    </div>
+
+                    <!-- Snapshot AML (Histórico en incidente/reporte) -->
+                    <div class="balance-card snapshot-card">
+                        <div class="card-meta-top">
+                            <i class="fa-regular fa-calendar-check"></i>
+                            <span>Snapshot AML (momento del reporte)</span>
+                        </div>
+                        <div class="token-balance-grid">
+                            <div class="token-item primary-token">
+                                <span class="token-ticker" id="snapshot-main-ticker">USDT</span>
+                                <span class="token-amount" id="snapshot-main-amount">254,04 US$</span>
+                            </div>
+                            <div class="token-item secondary-token">
+                                <span class="token-ticker" id="snapshot-sub-ticker">TRX</span>
+                                <span class="token-amount" id="snapshot-sub-amount">884,001</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Balance On-Chain en Tiempo Real -->
+                    <div class="balance-card live-card">
+                        <div class="card-meta-top">
+                            <div class="live-indicator">
+                                <span class="pulse-ring"></span>
+                                <i class="fa-solid fa-wave-pulse"></i>
+                            </div>
+                            <span>Balance On-Chain (tiempo real)</span>
+                        </div>
+                        <div class="token-balance-grid">
+                            <div class="token-item primary-token highlighted">
+                                <span class="token-ticker" id="live-main-ticker">USDT</span>
+                                <span class="token-amount text-highlight" id="live-main-amount">56.623,87 US$</span>
+                            </div>
+                            <div class="token-item secondary-token">
+                                <span class="token-ticker" id="live-sub-ticker">TRX</span>
+                                <span class="token-amount" id="live-sub-amount">286,203 TRX</span>
+                            </div>
+                        </div>
+                        <div class="card-meta-bottom">
+                            <span class="updated-time" id="live-updated-time">Actualizado: hoy en vivo</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Módulo de Estado de Congelamiento / Confiscación On-Chain -->
+                <div class="freeze-status-card" id="freeze-status-card">
+                    <div class="freeze-card-header">
+                        <div class="freeze-badge-group">
+                            <i class="fa-solid fa-snowflake" id="freeze-icon"></i>
+                            <span class="freeze-title">Estado de Congelamiento:</span>
+                        </div>
+                        <span class="freeze-pill-badge" id="freeze-pill-badge">NO CONGELADA</span>
+                    </div>
+
+                    <div class="freeze-details-content" id="freeze-details-content">
+                        <!-- Generado dinámicamente si está congelada o limpia -->
+                    </div>
+                </div>
+
+                <!-- Nivel de Riesgo Global -->
+                <div class="risk-level-banner">
+                    <span class="risk-label">Nivel de Riesgo:</span>
+                    <div class="risk-score-badge" id="risk-score-badge">
+                        <span class="risk-percentage" id="risk-percentage">80%</span>
+                        <span class="risk-tag-pill" id="risk-tag-pill">Alto</span>
+                    </div>
+                </div>
+
+                <!-- Visualización de Riesgo (Gráfico de Dona) -->
+                <div class="chart-section">
+                    <h3 class="chart-title">Visualización de Riesgo</h3>
+                    <div class="donut-chart-container">
+                        <canvas id="riskDonutChart"></canvas>
+                    </div>
+                    <div class="chart-legend-custom">
+                        <div class="legend-item"><span class="color-dot dot-risk"></span> <span id="legend-risk-label">Riesgo</span></div>
+                        <div class="legend-item"><span class="color-dot dot-safe"></span> <span>Seguro</span></div>
+                    </div>
+                </div>
+
+                <!-- Resumen de Análisis / Hallazgos Forenses -->
+                <div class="findings-section">
+                    <h3 class="section-subheading">
+                        <i class="fa-solid fa-list-check"></i> Desglose de Factores Forenses
+                    </h3>
+                    <div class="findings-list" id="findings-list">
+                        <!-- Generado dinámicamente por JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Desglose de Fuentes de Fondos -->
+                <div class="sources-breakdown">
+                    <h3 class="section-subheading">
+                        <i class="fa-solid fa-network-wired"></i> Origen Estimado de los Fondos
+                    </h3>
+                    <div class="sources-bars" id="sources-bars">
+                        <!-- Generado dinámicamente -->
+                    </div>
+                </div>
+
+                <!-- Historial de Transacciones (Últimos 2 Meses) -->
+                <div class="transactions-history-section">
+                    <div class="tx-section-header">
+                        <div class="tx-header-left">
+                            <h3 class="section-subheading" style="margin-bottom: 0;">
+                                <i class="fa-solid fa-clock-rotate-left"></i> Historial de Transacciones
+                            </h3>
+                            <span class="tx-timeframe-tag"><i class="fa-regular fa-calendar"></i> Últimos 60 días (2 meses)</span>
+                        </div>
+                        <span class="tx-count-pill" id="tx-count-badge">0 movimientos</span>
+                    </div>
+
+                    <div class="transactions-table-container">
+                        <div class="tx-list" id="tx-history-list">
+                            <!-- Generado dinámicamente con transacciones reales o auditadas -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botón de Exportar a PDF (Llamativo) -->
+                <div class="export-pdf-cta">
+                    <button class="btn-download-pdf-full" id="btn-pdf-download" onclick="exportReportToPDF()">
+                        <i class="fa-solid fa-file-pdf"></i>
+                        <span id="btn-pdf-text">Descargar Informe Forense Oficial (PDF)</span>
+                    </button>
+                </div>
+
+                <!-- Disclaimer Oficial -->
+                <div class="report-disclaimer">
+                    <p><i class="fa-solid fa-circle-info"></i> <strong>Aviso legal AML:</strong> Este escaneo cruza registros públicos descentralizados, bases de sanciones internacionales (OFAC/OFSI/ONU) y heurísticas de seguridad on-chain. Úselo como apoyo para la diligencia debida.</p>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Plantilla Optimizada Exclusiva para Generación de PDF (1 Sola Página A4 Ejecutiva) -->
+        <div id="pdf-printable-template" class="pdf-document" style="display: none;">
+            <!-- Header del Documento PDF -->
+            <div class="pdf-doc-header">
+                <div class="pdf-doc-brand">
+                    <div class="pdf-logo-box">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                    <div>
+                        <h2>CryptoGuard <span>AML</span></h2>
+                        <span class="pdf-subtag">INFORME FORENSE Y AUDITORÍA DE RIESGO ON-CHAIN</span>
+                    </div>
+                </div>
+                <div class="pdf-doc-stamp">
+                    <div class="stamp-pill" id="pdf-stamp-pill">RIESGO ALTO</div>
+                    <div class="pdf-meta-ref">REF: <span id="pdf-ref-id">CG-AML-2026</span></div>
+                </div>
+            </div>
+
+            <!-- Fila 1: Metadatos de la Billetera -->
+            <div class="pdf-section-box">
+                <div class="pdf-meta-grid">
+                    <div class="pdf-meta-item full-width">
+                        <span class="pdf-label">DIRECCIÓN AUDITADA:</span>
+                        <span class="pdf-value pdf-mono" id="pdf-address">--</span>
+                    </div>
+                    <div class="pdf-meta-item">
+                        <span class="pdf-label">RED BLOCKCHAIN:</span>
+                        <span class="pdf-value" id="pdf-network">--</span>
+                    </div>
+                    <div class="pdf-meta-item">
+                        <span class="pdf-label">FECHA Y HORA (UTC):</span>
+                        <span class="pdf-value pdf-mono" id="pdf-date">--</span>
+                    </div>
+                    <div class="pdf-meta-item">
+                        <span class="pdf-label">BASE DE SANCIONES:</span>
+                        <span class="pdf-value">OFAC, OFSI, UN, Interpol (Actualizado)</span>
+                    </div>
+                    <div class="pdf-meta-item">
+                        <span class="pdf-label">ESTADO DEL ANÁLISIS:</span>
+                        <span class="pdf-value" id="pdf-status-text">Completado / Alertas detectadas</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fila 2: Balances y Nivel de Riesgo (2 Columnas) -->
+            <div class="pdf-columns-2">
+                <!-- Columna Izquierda: Balances -->
+                <div class="pdf-card">
+                    <div class="pdf-card-title"><i class="fa-solid fa-wallet"></i> Resumen de Balances Detectados</div>
+                    
+                    <div class="pdf-balance-box">
+                        <div class="pdf-box-header"><i class="fa-regular fa-calendar-check"></i> Snapshot AML (Momento del Incidente/Reporte)</div>
+                        <div class="pdf-balance-values">
+                            <div class="pdf-val-main" id="pdf-snapshot-usdt">0,00 US$</div>
+                            <div class="pdf-val-sub" id="pdf-snapshot-native">0 TRX</div>
+                        </div>
+                    </div>
+
+                    <div class="pdf-balance-box highlight-box">
+                        <div class="pdf-box-header"><i class="fa-solid fa-wave-pulse"></i> Balance On-Chain en Vivo</div>
+                        <div class="pdf-balance-values">
+                            <div class="pdf-val-main val-teal" id="pdf-live-usdt">0,00 US$</div>
+                            <div class="pdf-val-sub" id="pdf-live-native">0 TRX</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Columna Derecha: Gráfico y Puntuación de Riesgo -->
+                <div class="pdf-card pdf-risk-card">
+                    <div class="pdf-card-title"><i class="fa-solid fa-gauge-high"></i> Puntuación de Riesgo AML</div>
+                    <div class="pdf-risk-display">
+                        <div class="pdf-score-number" id="pdf-risk-score">80%</div>
+                        <div class="pdf-score-badge" id="pdf-risk-badge">ALTO RIESGO</div>
+                    </div>
+                    <div class="pdf-chart-wrapper">
+                        <img id="pdf-chart-image" class="pdf-chart-img" alt="Gráfico de Riesgo">
+                    </div>
+                    <div class="pdf-chart-legend">
+                        <span><b style="color: #ef4444;">■</b> Riesgo: <span id="pdf-legend-risk">80%</span></span>
+                        <span><b style="color: #64748b;">■</b> Seguro: <span id="pdf-legend-safe">20%</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fila 3: Hallazgos Forenses y Origen de Fondos -->
+            <div class="pdf-columns-2">
+                <!-- Hallazgos Forenses -->
+                <div class="pdf-card">
+                    <div class="pdf-card-title"><i class="fa-solid fa-list-check"></i> Factores de Riesgo Detectados</div>
+                    <div class="pdf-findings-list" id="pdf-findings-list">
+                        <!-- Llenado dinámicamente -->
+                    </div>
+                </div>
+
+                <!-- Fuentes de Fondos -->
+                <div class="pdf-card">
+                    <div class="pdf-card-title"><i class="fa-solid fa-network-wired"></i> Origen Estimado de Fondos</div>
+                    <div class="pdf-sources-list" id="pdf-sources-list">
+                        <!-- Llenado dinámicamente -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pie de Página Legal del PDF -->
+            <div class="pdf-footer">
+                <div class="pdf-footer-note">
+                    <strong>Certificado de Análisis On-Chain:</strong> Este reporte fue generado de forma automática mediante la indexación de la blockchain pública correspondiente y cruce de datos heurísticos. La validez legal depende de la jurisdicción aplicable.
+                </div>
+                <div class="pdf-footer-meta">
+                    Página 1 de 1 &bull; Generado con CryptoGuard AML Multi-Chain Engine
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="app-footer">
+        <p>CryptoGuard AML Scanner &bull; Escaneo forense descentralizado multi-chain &bull; No requiere conectar tu wallet</p>
+    </footer>
+
+    <!-- Notificación Toast -->
+    <div id="toast" class="toast">Mensaje copiado</div>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -163,78 +163,206 @@ function loadSample(sampleKey) {
 }
 
 /**
+ * Convierte los últimos 10 bytes de una dirección TRON Base58Check a hex en minúsculas.
+ * TronGrid devuelve to_address como hex (ej: 41xxxxxxxx...), cuyo sufijo de 20 bytes
+ * equivale a la representación interna de la dirección TRON.
+ * Usamos esto para comparar de forma robusta sin necesidad de una librería externa.
+ */
+function b58ToHexSuffix(tronAddress) {
+    const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+    let num = BigInt(0);
+    for (const char of tronAddress) {
+        const idx = ALPHABET.indexOf(char);
+        if (idx < 0) return '';
+        num = num * BigInt(58) + BigInt(idx);
+    }
+    // Convertir a hex y tomar los últimos 40 chars (20 bytes = la parte de dirección sin checksum y sin prefijo 0x41)
+    let hex = num.toString(16);
+    // Pad a 50 hex chars (25 bytes: 1 byte prefix 0x41 + 20 bytes addr + 4 bytes checksum)
+    hex = hex.padStart(50, '0');
+    // Los bytes de la dirección están en los bytes 1..20 (offset 2..41 en hex, sin checksum)
+    return hex.substring(2, 42).toLowerCase();
+}
+
+/**
  * Consulta on-chain real a través de APIs públicas descentralizadas (TronGrid, Blockstream, etc.)
  */
 async function fetchLiveWalletData(address, network) {
     let nativeBalance = 0;
     let usdtBalance = 0;
     let totalTxs = 0;
-    let isContract = false;
     let realDataFound = false;
 
     let rawTransactions = [];
 
-    // Red TRON (TronGrid API Oficial)
+    // Red TRON (TronGrid API Oficial + fallback Tronscan)
     if (network === 'tron') {
-        try {
-            const resp = await fetch(`https://api.trongrid.io/v1/accounts/${address}`);
-            if (resp.ok) {
-                const resJson = await resp.json();
-                if (resJson.data && resJson.data.length > 0) {
-                    const acc = resJson.data[0];
-                    realDataFound = true;
-                    // Balance TRX (1 TRX = 1,000,000 SUN)
-                    nativeBalance = (acc.balance || 0) / 1000000;
-                    
-                    // Buscar balance USDT TRC-20 (Contrato TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t con 6 decimales)
-                    if (acc.trc20 && Array.isArray(acc.trc20)) {
-                        acc.trc20.forEach(tokenObj => {
-                            if (tokenObj['TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t']) {
-                                usdtBalance = parseFloat(tokenObj['TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t']) / 1000000;
-                            }
-                        });
-                    }
+        // Intentar primero con TronGrid
+        const tronGridEndpoints = [
+            `https://api.trongrid.io/v1/accounts/${address}`,
+            `https://api.shasta.trongrid.io/v1/accounts/${address}` // fallback testnet (para debug)
+        ];
 
-                    // Consultar transacciones TRC-20 específicas (USDT con montos reales) y transacciones normales
-                    try {
-                        const trc20Resp = await fetch(`https://api.trongrid.io/v1/accounts/${address}/transactions/trc20?limit=25`);
-                        if (trc20Resp.ok) {
-                            const trc20Json = await trc20Resp.json();
-                            if (trc20Json.data && trc20Json.data.length > 0) {
-                                rawTransactions = trc20Json.data.map(item => ({
-                                    isTrc20: true,
-                                    txID: item.transaction_id,
-                                    block_timestamp: item.block_timestamp,
-                                    from: item.from,
-                                    to: item.to,
-                                    symbol: item.token_info?.symbol || 'USDT',
-                                    decimals: item.token_info?.decimals || 6,
-                                    value: item.value,
-                                    type: 'Transferencia ' + (item.token_info?.symbol || 'USDT')
-                                }));
+        for (const endpoint of tronGridEndpoints) {
+            try {
+                const resp = await fetch(endpoint, {
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (resp.ok) {
+                    const resJson = await resp.json();
+                    if (resJson.data && resJson.data.length > 0) {
+                        const acc = resJson.data[0];
+                        realDataFound = true;
+                        // Balance TRX (1 TRX = 1,000,000 SUN)
+                        nativeBalance = (acc.balance || 0) / 1000000;
+
+                        // Buscar balance USDT TRC-20 (Contrato TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t con 6 decimales)
+                        if (acc.trc20 && Array.isArray(acc.trc20)) {
+                            acc.trc20.forEach(tokenObj => {
+                                const usdtKey = Object.keys(tokenObj).find(k =>
+                                    k === 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'
+                                );
+                                if (usdtKey) {
+                                    usdtBalance = parseFloat(tokenObj[usdtKey]) / 1_000_000;
+                                }
+                            });
+                        }
+                        break; // Éxito, salir del loop
+                    }
+                }
+            } catch(err) {
+                console.warn('Error consultando TronGrid endpoint:', endpoint, err);
+            }
+        }
+
+        // Si TronGrid no devolvió datos, intentar con Tronscan API (sin CORS issues)
+        if (!realDataFound) {
+            try {
+                const tronscanResp = await fetch(`https://apilist.tronscanapi.com/api/accountv2?address=${address}`);
+                if (tronscanResp.ok) {
+                    const tsData = await tronscanResp.json();
+                    if (tsData && (tsData.balance !== undefined || tsData.tokenBalances)) {
+                        realDataFound = true;
+                        nativeBalance = (tsData.balance || 0) / 1_000_000;
+                        // Buscar USDT en tokenBalances de Tronscan
+                        if (tsData.trc20token_balances && Array.isArray(tsData.trc20token_balances)) {
+                            const usdtToken = tsData.trc20token_balances.find(t =>
+                                t.tokenId === 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'
+                            );
+                            if (usdtToken) {
+                                usdtBalance = parseFloat(usdtToken.balance || 0) / Math.pow(10, usdtToken.tokenDecimal || 6);
                             }
                         }
-                    } catch(e) {}
-
-                    // Si no hubo transferencias TRC-20, consultar transacciones nativas TRX
-                    if (rawTransactions.length === 0) {
-                        try {
-                            const txResp = await fetch(`https://api.trongrid.io/v1/accounts/${address}/transactions?limit=25`);
-                            if (txResp.ok) {
-                                const txJson = await txResp.json();
-                                if (txJson.data && txJson.data.length > 0) {
-                                    rawTransactions = txJson.data;
-                                }
-                            }
-                        } catch(e) {}
                     }
-                    totalTxs = rawTransactions.length;
+                }
+            } catch(e) {
+                console.warn('Error consultando Tronscan:', e);
+            }
+        }
+
+        // Consultar transacciones TRC-20 (USDT)
+        if (realDataFound) {
+            try {
+                const trc20Resp = await fetch(
+                    `https://api.trongrid.io/v1/accounts/${address}/transactions/trc20?limit=25`,
+                    { headers: { 'Accept': 'application/json' } }
+                );
+                if (trc20Resp.ok) {
+                    const trc20Json = await trc20Resp.json();
+                    if (trc20Json.data && trc20Json.data.length > 0) {
+                        rawTransactions = trc20Json.data.map(item => ({
+                            isTrc20: true,
+                            txID: item.transaction_id,
+                            block_timestamp: item.block_timestamp,
+                            from: item.from,
+                            to: item.to,
+                            symbol: item.token_info?.symbol || 'USDT',
+                            decimals: item.token_info?.decimals || 6,
+                            value: item.value,
+                            type: 'Transferencia ' + (item.token_info?.symbol || 'USDT')
+                        }));
+                    }
+                }
+            } catch(e) {}
+
+            // Si no hubo TRC-20, consultar transacciones nativas TRX
+            if (rawTransactions.length === 0) {
+                try {
+                    const txResp = await fetch(
+                        `https://api.trongrid.io/v1/accounts/${address}/transactions?limit=25`,
+                        { headers: { 'Accept': 'application/json' } }
+                    );
+                    if (txResp.ok) {
+                        const txJson = await txResp.json();
+                        if (txJson.data && txJson.data.length > 0) {
+                            rawTransactions = txJson.data;
+                        }
+                    }
+                } catch(e) {}
+            }
+            totalTxs = rawTransactions.length;
+        }
+    }
+    // Red ETHEREUM / BSC / Polygon (Etherscan-compatible APIs)
+    else if (network === 'ethereum' || network === 'bsc' || network === 'polygon') {
+        // APIs públicas sin key para balance nativo
+        const rpcUrls = {
+            'ethereum': 'https://eth.llamarpc.com',
+            'bsc':      'https://bsc-dataseed.binance.org/',
+            'polygon':  'https://polygon-rpc.com'
+        };
+        const usdtContracts = {
+            'ethereum': '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+            'bsc':      '0x55d398326f99059fF775485246999027B3197955',
+            'polygon':  '0xc2132D05D31c914a87C6611C10748AEb04B58e8F'
+        };
+        const rpcUrl = rpcUrls[network];
+        const usdtContract = usdtContracts[network];
+
+        try {
+            // Balance nativo via JSON-RPC
+            const rpcResp = await fetch(rpcUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    jsonrpc: '2.0', id: 1,
+                    method: 'eth_getBalance',
+                    params: [address, 'latest']
+                })
+            });
+            if (rpcResp.ok) {
+                const rpcData = await rpcResp.json();
+                if (rpcData.result) {
+                    realDataFound = true;
+                    nativeBalance = parseInt(rpcData.result, 16) / 1e18;
                 }
             }
-        } catch(err) {
-            console.warn('Error consultando TronGrid:', err);
+        } catch(e) { console.warn('RPC balance error:', e); }
+
+        // Balance USDT via ERC-20 balanceOf call
+        if (usdtContract) {
+            try {
+                const rpcUrl2 = rpcUrls[network];
+                // balanceOf(address) = keccak256('balanceOf(address)')[0:4] = 0x70a08231
+                const data = '0x70a08231' + address.replace('0x', '').padStart(64, '0');
+                const usdtResp = await fetch(rpcUrl2, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0', id: 2,
+                        method: 'eth_call',
+                        params: [{ to: usdtContract, data }, 'latest']
+                    })
+                });
+                if (usdtResp.ok) {
+                    const usdtData = await usdtResp.json();
+                    if (usdtData.result && usdtData.result !== '0x') {
+                        usdtBalance = parseInt(usdtData.result, 16) / 1e6; // USDT tiene 6 decimales
+                    }
+                }
+            } catch(e) { console.warn('USDT balance error:', e); }
         }
-    } 
+    }
     // Red BITCOIN (Blockstream API)
     else if (network === 'bitcoin') {
         try {
@@ -252,6 +380,27 @@ async function fetchLiveWalletData(address, network) {
                 rawTransactions = await btcTxResp.json();
             }
         } catch(e) {}
+    }
+    // Red SOLANA (Helius / público RPC)
+    else if (network === 'solana') {
+        try {
+            const solResp = await fetch('https://api.mainnet-beta.solana.com', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    jsonrpc: '2.0', id: 1,
+                    method: 'getBalance',
+                    params: [address]
+                })
+            });
+            if (solResp.ok) {
+                const solData = await solResp.json();
+                if (solData.result !== undefined) {
+                    realDataFound = true;
+                    nativeBalance = (solData.result.value || 0) / 1e9; // Lamports a SOL
+                }
+            }
+        } catch(e) { console.warn('Solana RPC error:', e); }
     }
 
     // Calcular análisis de riesgo en base a los datos on-chain obtenidos y estructurar transacciones
@@ -444,8 +593,18 @@ function buildAnalysisResult(address, network, nativeBalance, usdtBalance, total
                     const amountSun = paramVal.amount || 0;
                     const trxVal = (amountSun / 1000000).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
                     
-                    const toHex = paramVal.to_address || '';
-                    if (toHex.toLowerCase().includes('b8763d65da6f0f3a0b0da4670a076f73667144bd')) {
+                    // Convertir dirección base58 a hex para comparar con to_address (formato hex TronGrid)
+                    const toHex = (paramVal.to_address || '').toLowerCase();
+                    // TronGrid devuelve to_address en formato hex 21 bytes (ej: 41...)
+                    // Comparar si la dirección auditada (en cualquier forma) aparece en el destino
+                    const isReceiver = (
+                        toHex === address.toLowerCase() ||
+                        toHex.endsWith(address.slice(-34).toLowerCase()) ||
+                        // Intentar match por los últimos bytes del hex de to_address vs address
+                        (toHex.length >= 40 && address.length >= 34 &&
+                         toHex.slice(-20) === b58ToHexSuffix(address))
+                    );
+                    if (isReceiver) {
                         flow = 'in';
                         flowLabel = 'Recibido';
                         amountStr = `+ ${trxVal} TRX`;
@@ -540,8 +699,8 @@ function buildAnalysisResult(address, network, nativeBalance, usdtBalance, total
         address: address,
         network: network,
         networkLabel: netLabels[network] || network.toUpperCase(),
-        snapshotUSDT: `${parseFloat(snapshotUSDTVal).toLocaleString('es-ES', { minimumFractionDigits: 2 })} US$`,
-        snapshotNative: `${parseFloat(snapshotNativeVal).toLocaleString('es-ES')} ${tickers.sub}`,
+        snapshotUSDT: `${parseFloat(snapshotUSDTVal).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} US$`,
+        snapshotNative: `${parseFloat(snapshotNativeVal).toLocaleString('es-ES', { minimumFractionDigits: 3, maximumFractionDigits: 6 })} ${tickers.sub}`,
         liveUSDT: formattedLiveUSDT,
         liveNative: formattedLiveNative,
         riskPercent: riskScore,

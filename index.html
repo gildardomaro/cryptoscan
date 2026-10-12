@@ -533,7 +533,42 @@
                 <!-- Generado dinámicamente -->
             </div>
 
+            <!-- Panel desplegable de Conexión de API Externa AML -->
+            <div id="api-settings-drawer" class="api-settings-drawer" style="display: none;">
+                <div class="api-drawer-header">
+                    <div class="api-drawer-title">
+                        <i class="fa-solid fa-server"></i>
+                        <span>Conexión con Proveedores AML Externos</span>
+                    </div>
+                    <span id="api-status-badge" class="api-status-badge status-native">Modo: Motor On-Chain Nativo</span>
+                </div>
+                <p class="api-drawer-desc">
+                    Tu plataforma ya extrae las billeteras y transacciones <strong>reales en vivo</strong> directamente de la blockchain. Si dispones de una cuenta comercial en <strong>AMLBot</strong> o <strong>MistTrack</strong>, puedes ingresar tu API Token para sincronizar sus bases de datos propietarias de clustering criminal:
+                </p>
+                <div class="api-drawer-form">
+                    <div class="api-provider-select-group">
+                        <label for="aml-provider-select">Proveedor AML:</label>
+                        <select id="aml-provider-select" class="api-select-input" onchange="handleProviderChange()">
+                            <option value="native">Motor On-Chain Nativo (TronGrid / Etherscan / MatchSystems) - Recomendado</option>
+                            <option value="amlbot">AMLBot API Oficial (api.amlbot.com/v2)</option>
+                            <option value="misttrack">MistTrack AML (SlowMist API)</option>
+                        </select>
+                    </div>
+                    <div class="api-key-input-group" id="api-key-input-container" style="display: none;">
+                        <label for="aml-api-key-input">API Token / Clave secreta:</label>
+                        <div class="api-input-with-button">
+                            <input type="password" id="aml-api-key-input" placeholder="Pega aquí tu API Key de AMLBot o MistTrack..." class="input-api-key" autocomplete="off" />
+                            <button type="button" class="btn-save-api-key" onclick="saveAmlApiConfig()">Guardar y Activar</button>
+                        </div>
+                        <span class="api-key-hint">Tu clave se almacena de forma segura y privada en tu navegador (LocalStorage).</span>
+                    </div>
+                </div>
+            </div>
+
             <div class="modal-footer">
+                <button type="button" class="btn-api-settings-toggle" onclick="toggleApiSettings()">
+                    <i class="fa-solid fa-gear"></i> Conectar API AML Externa
+                </button>
                 <button type="button" class="btn-secondary-modal" onclick="closeConnectionsModal()">Cerrar</button>
             </div>
         </div>

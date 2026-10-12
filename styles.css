@@ -517,6 +517,11 @@ body {
     color: var(--risk-low);
 }
 
+.status-icon-bubble.medium {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+}
+
 .status-title-group h2 {
     font-size: 1.45rem;
     font-weight: 800;
@@ -710,6 +715,11 @@ body {
 }
 
 .freeze-reasons-list li i {
+    color: #ef4444;
+    margin-top: 0.15rem;
+    font-size: 0.75rem;
+}
+
 /* =========================================
    HISTORIAL DE TRANSACCIONES (2 MESES)
    ========================================= */

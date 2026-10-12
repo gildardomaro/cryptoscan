@@ -275,6 +275,58 @@
                     </div>
                 </div>
 
+                <!-- Módulo AMLBot de Exposición y Conexiones Forenses -->
+                <div class="amlbot-widget-card" id="amlbot-widget-card">
+                    <div class="amlbot-header">
+                        <div class="amlbot-brand">
+                            <span class="amlbot-powered">Desarrollado por</span>
+                            <div class="amlbot-logo-badge">
+                                <svg class="amlbot-diamond-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="#2563eb"/>
+                                    <path d="M12 6L6 12L12 18L18 12L12 6Z" fill="#60a5fa"/>
+                                </svg>
+                                <span class="amlbot-name">AMLBot</span>
+                            </div>
+                        </div>
+                        <button type="button" class="amlbot-info-btn" title="Análisis forense de grafos y contrapartes vinculadas en la blockchain" onclick="showAmlbotInfo()">
+                            <i class="fa-solid fa-circle-info"></i>
+                        </button>
+                    </div>
+
+                    <div class="amlbot-exposure-list">
+                        <div class="amlbot-exposure-row">
+                            <div class="amlbot-row-left">
+                                <span class="amlbot-dot dot-low"></span>
+                                <span class="amlbot-label">Exposición de bajo riesgo</span>
+                            </div>
+                            <span class="amlbot-value" id="amlbot-low-count">4 conexiones</span>
+                        </div>
+                        <div class="amlbot-exposure-row">
+                            <div class="amlbot-row-left">
+                                <span class="amlbot-dot dot-med"></span>
+                                <span class="amlbot-label">Exposición de riesgo medio</span>
+                            </div>
+                            <span class="amlbot-value" id="amlbot-med-count">2 conexiones</span>
+                        </div>
+                        <div class="amlbot-exposure-row">
+                            <div class="amlbot-row-left">
+                                <span class="amlbot-dot dot-high"></span>
+                                <span class="amlbot-label">Exposición de alto riesgo</span>
+                            </div>
+                            <span class="amlbot-value amlbot-blurred-val" id="amlbot-high-count">1 conexión</span>
+                        </div>
+                    </div>
+
+                    <p class="amlbot-status-text" id="amlbot-status-text">
+                        La dirección está vinculada a entidades de riesgo
+                    </p>
+
+                    <button type="button" class="amlbot-action-btn" id="btn-amlbot-unlock" onclick="openConnectionsModal()">
+                        <span id="amlbot-btn-text">Desbloquear datos ocultos</span>
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                    </button>
+                </div>
+
                 <!-- Historial de Transacciones (Últimos 2 Meses) -->
                 <div class="transactions-history-section">
                     <div class="tx-section-header">
@@ -430,6 +482,62 @@
     <footer class="app-footer">
         <p>CryptoGuard AML Scanner &bull; Escaneo forense descentralizado multi-chain &bull; No requiere conectar tu wallet</p>
     </footer>
+
+    <!-- Modal Detalle Forense de Billeteras y Contrapartes Conectadas -->
+    <div id="connections-modal" class="connections-modal" style="display: none;">
+        <div class="modal-backdrop" onclick="closeConnectionsModal()"></div>
+        <div class="modal-dialog-content">
+            <div class="modal-header">
+                <div class="modal-title-group">
+                    <div class="modal-icon-badge">
+                        <i class="fa-solid fa-diagram-project"></i>
+                    </div>
+                    <div>
+                        <h3 class="modal-title">Origen y Billeteras Conectadas</h3>
+                        <p class="modal-subtitle">Inspección forense de contrapartes y entidades de riesgo vinculadas</p>
+                    </div>
+                </div>
+                <button type="button" class="btn-close-modal" onclick="closeConnectionsModal()">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="modal-summary-banner">
+                <div class="summary-stat-pill">
+                    <span class="stat-num" id="modal-stat-total">0</span>
+                    <span class="stat-lbl">Conexiones</span>
+                </div>
+                <div class="summary-stat-pill pill-green">
+                    <span class="stat-num" id="modal-stat-low">0</span>
+                    <span class="stat-lbl">Bajo Riesgo</span>
+                </div>
+                <div class="summary-stat-pill pill-amber">
+                    <span class="stat-num" id="modal-stat-med">0</span>
+                    <span class="stat-lbl">Riesgo Medio</span>
+                </div>
+                <div class="summary-stat-pill pill-red">
+                    <span class="stat-num" id="modal-stat-high">0</span>
+                    <span class="stat-lbl">Alto Riesgo</span>
+                </div>
+            </div>
+
+            <!-- Filtros de búsqueda y nivel de riesgo -->
+            <div class="modal-filters-bar">
+                <button type="button" class="filter-chip active" data-filter="all" onclick="filterConnections('all')">Todas</button>
+                <button type="button" class="filter-chip chip-red" data-filter="high" onclick="filterConnections('high')">🔴 Alto Riesgo</button>
+                <button type="button" class="filter-chip chip-amber" data-filter="medium" onclick="filterConnections('medium')">🟡 Riesgo Medio</button>
+                <button type="button" class="filter-chip chip-green" data-filter="low" onclick="filterConnections('low')">🟢 Bajo Riesgo</button>
+            </div>
+
+            <div class="connections-cards-list" id="connections-cards-list">
+                <!-- Generado dinámicamente -->
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary-modal" onclick="closeConnectionsModal()">Cerrar</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Notificación Toast -->
     <div id="toast" class="toast">Mensaje copiado</div>

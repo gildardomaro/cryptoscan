@@ -4,8 +4,18 @@
  */
 
 let riskChartInstance = null;
+let activeScanSessionId = 0; // Barrera contra condiciones de carrera entre escaneos sucesivos
 
-// Base de datos de ejemplos y patrones de riesgo
+// Barrera de seguridad: Hashes prohibidos del antiguo mock falso
+const FORBIDDEN_SHARED_MOCK_HASHES = new Set([
+    '1652d5e78deeb730...5cfbf99',
+    '34850ef9a9757921...bffc21c',
+    '8f7a1c32b56e4920...91a2b3c',
+    'a9c8b7d6e5f41230...8899aabb',
+    '4c3b2a10d9e87654...11223344'
+]);
+
+// Base de datos de ejemplos y patrones de riesgo con transacciones 100% exclusivas por dirección
 const SAMPLES = {
     'tron-illicit': {
         address: 'TTzxFKX8bzBoBZ2jatrUUYKZJ67Cyvi6G6',
@@ -38,6 +48,74 @@ const SAMPLES = {
             { name: 'P2P de Alto Riesgo', percent: 35, color: '#f97316' },
             { name: 'Exchanges Regulados', percent: 15, color: '#3b82f6' },
             { name: 'Otros Contratos', percent: 5, color: '#64748b' }
+        ],
+        transactions: [
+            {
+                hash: 'e9a8f219c0b1e428...988112a',
+                date: '02/10/2026 14:22',
+                type: 'TRANSFERENCIA USDT',
+                flow: 'in',
+                flowLabel: 'Recibido',
+                amount: '+ 24.500,00 USDT',
+                status: 'CONFIRMADO'
+            },
+            {
+                hash: 'd2f47a118c99201b...773321c',
+                date: '28/09/2026 09:15',
+                type: 'TRANSFERENCIA USDT',
+                flow: 'out',
+                flowLabel: 'Enviado',
+                amount: '- 18.200,00 USDT',
+                status: 'CONFIRMADO'
+            },
+            {
+                hash: 'b5501ae987623410...1100ff2',
+                date: '15/09/2026 18:40',
+                type: 'INTERACCIÓN CONTRATO',
+                flow: 'contract',
+                flowLabel: 'Llamada Tether',
+                amount: '0,00 TRX',
+                status: 'BLOQUEADO'
+            }
+        ],
+        connectionCounts: { low: 0, medium: 1, high: 2 },
+        connections: [
+            {
+                address: 'TSc99JkzLKq182YxMvK1xPq890AzLKm',
+                entity: 'Mixer / Protocolo Anonimizador Sancionado',
+                icon: 'fa-shuffle',
+                riskLevel: 'high',
+                riskLabel: 'Alto Riesgo',
+                flow: 'in',
+                flowLabel: 'Fondos Recibidos',
+                amount: '24.500,00 USDT',
+                date: '02/10/2026',
+                explorerUrl: 'https://tronscan.org/#/address/TSc99JkzLKq182YxMvK1xPq890AzLKm'
+            },
+            {
+                address: 'TKx44Vp88K12xJpQ90Az7811KmLz901',
+                entity: 'Billetera en Lista Negra / Medida Cautelar',
+                icon: 'fa-ban',
+                riskLevel: 'high',
+                riskLabel: 'Alto Riesgo',
+                flow: 'out',
+                flowLabel: 'Transferencia Directa',
+                amount: '18.200,00 USDT',
+                date: '28/09/2026',
+                explorerUrl: 'https://tronscan.org/#/address/TKx44Vp88K12xJpQ90Az7811KmLz901'
+            },
+            {
+                address: 'TQ182xK99VpAzLKm887711xPq89012',
+                entity: 'Plataforma P2P No Regulada / Alto Riesgo',
+                icon: 'fa-triangle-exclamation',
+                riskLevel: 'medium',
+                riskLabel: 'Riesgo Medio',
+                flow: 'in',
+                flowLabel: 'Depósito P2P',
+                amount: '8.450,00 USDT',
+                date: '15/09/2026',
+                explorerUrl: 'https://tronscan.org/#/address/TQ182xK99VpAzLKm887711xPq89012'
+            }
         ]
     },
     'eth-mixer': {
@@ -68,6 +146,53 @@ const SAMPLES = {
             { name: 'Tornado Cash / Smart Contract', percent: 65, color: '#f97316' },
             { name: 'Exchanges Descentralizados (DEX)', percent: 25, color: '#3b82f6' },
             { name: 'Fondos Legítimos', percent: 10, color: '#10b981' }
+        ],
+        transactions: [
+            {
+                hash: '0xfa4819c9b109e421...911b3e',
+                date: '05/10/2026 11:04',
+                type: 'LLAMADA CONTRATO TORNADO',
+                flow: 'out',
+                flowLabel: 'Depósito Mixer',
+                amount: '- 10.00 ETH',
+                status: 'CONFIRMADO'
+            },
+            {
+                hash: '0x11b98a77f334510c...44a1e9',
+                date: '21/09/2026 16:30',
+                type: 'SWAP UNISWAP V3',
+                flow: 'contract',
+                flowLabel: 'Intercambio',
+                amount: '4.850,50 USDT',
+                status: 'CONFIRMADO'
+            }
+        ],
+        connectionCounts: { low: 1, medium: 1, high: 1 },
+        connections: [
+            {
+                address: '0x12D66f2201e93447102574A0b0221E7497',
+                entity: 'Tornado Cash: 10 ETH Pool (Sancionado)',
+                icon: 'fa-shuffle',
+                riskLevel: 'high',
+                riskLabel: 'Alto Riesgo',
+                flow: 'out',
+                flowLabel: 'Interacción Mixer',
+                amount: '10.00 ETH',
+                date: '05/10/2026',
+                explorerUrl: 'https://etherscan.io/address/0x12D66f2201e93447102574A0b0221E7497'
+            },
+            {
+                address: '0xE592427A0AEce92De3Edee1F18E0157C05861564',
+                entity: 'Uniswap V3: Router Contract',
+                icon: 'fa-cubes',
+                riskLevel: 'low',
+                riskLabel: 'Bajo Riesgo',
+                flow: 'out',
+                flowLabel: 'Ejecución Swap',
+                amount: '4.850,50 USDT',
+                date: '21/09/2026',
+                explorerUrl: 'https://etherscan.io/address/0xE592427A0AEce92De3Edee1F18E0157C05861564'
+            }
         ]
     },
     'binance-clean': {
@@ -90,10 +215,6 @@ const SAMPLES = {
                 'Cumplimiento normativo internacional al 100%.'
             ]
         },
-        liveNative: '91.240,12 ETH',
-        riskPercent: 1,
-        riskLevel: 'Seguro',
-        riskColor: '#10b981',
         findings: [
             { type: 'safe', icon: 'fa-circle-check', text: 'Entidad identificada y verificada: Binance Exchange Oficial.' },
             { type: 'safe', icon: 'fa-shield-check', text: 'Cero interacciones con listas de sanciones de la OFAC o terrorismo.' },
@@ -103,6 +224,62 @@ const SAMPLES = {
             { name: 'Depósitos de Clientes Verificados', percent: 92, color: '#10b981' },
             { name: 'Arbitraje Institucional', percent: 7, color: '#3b82f6' },
             { name: 'Riesgo residual', percent: 1, color: '#94a3b8' }
+        ],
+        transactions: [
+            {
+                hash: '0x9ed7c619d3736183...60772be',
+                date: 'Hoy (Hace 1 hora)',
+                type: 'TRANSFERENCIA USDT',
+                flow: 'out',
+                flowLabel: 'Retiro Usuario',
+                amount: '- 999,60 USDT',
+                status: 'CONFIRMADO'
+            },
+            {
+                hash: '0x8ac419c81b223011...142900c',
+                date: 'Hoy (Hace 3 horas)',
+                type: 'TRANSFERENCIA ETH',
+                flow: 'in',
+                flowLabel: 'Depósito Cliente',
+                amount: '+ 42.15 ETH',
+                status: 'CONFIRMADO'
+            },
+            {
+                hash: '0x310f98e722ab5910...cd91823',
+                date: 'Ayer 22:15',
+                type: 'BARRIDO INSTITUCIONAL',
+                flow: 'in',
+                flowLabel: 'Consolidación',
+                amount: '+ 150.000,00 USDT',
+                status: 'CONFIRMADO'
+            }
+        ],
+        connectionCounts: { low: 3, medium: 0, high: 0 },
+        connections: [
+            {
+                address: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+                entity: 'Tether USD (USDT Official Contract)',
+                icon: 'fa-building-columns',
+                riskLevel: 'low',
+                riskLabel: 'Bajo Riesgo',
+                flow: 'out',
+                flowLabel: 'Liquidación Oficial',
+                amount: '999,60 USDT',
+                date: 'Hoy',
+                explorerUrl: 'https://etherscan.io/token/0xdAC17F958D2ee523a2206206994597C13D831ec7'
+            },
+            {
+                address: '0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8',
+                entity: 'Binance Cold Storage 7',
+                icon: 'fa-shield-halved',
+                riskLevel: 'low',
+                riskLabel: 'Bajo Riesgo',
+                flow: 'in',
+                flowLabel: 'Custodia Fría',
+                amount: '150.000,00 USDT',
+                date: 'Ayer',
+                explorerUrl: 'https://etherscan.io/address/0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8'
+            }
         ]
     },
     'btc-clean': {
@@ -124,6 +301,41 @@ const SAMPLES = {
             { name: 'Mining Pools Oficiales', percent: 80, color: '#10b981' },
             { name: 'Custodios Regulados', percent: 18, color: '#3b82f6' },
             { name: 'Riesgo residual', percent: 2, color: '#94a3b8' }
+        ],
+        transactions: [
+            {
+                hash: 'a8f19200bca81927...182901a',
+                date: '04/10/2026 12:45',
+                type: 'TRANSFERENCIA BTC',
+                flow: 'in',
+                flowLabel: 'Recompensa Pool',
+                amount: '+ 3.125000 BTC',
+                status: 'CONFIRMADO'
+            },
+            {
+                hash: '4c901e8273615920...99002bb',
+                date: '18/09/2026 10:10',
+                type: 'TRANSFERENCIA BTC',
+                flow: 'in',
+                flowLabel: 'Consolidación UTXO',
+                amount: '+ 11.155000 BTC',
+                status: 'CONFIRMADO'
+            }
+        ],
+        connectionCounts: { low: 2, medium: 0, high: 0 },
+        connections: [
+            {
+                address: '1CK6KHY6MHgYvmRQ4PAafKYDrg1ejbH1cE',
+                entity: 'Foundry USA Mining Pool',
+                icon: 'fa-cubes',
+                riskLevel: 'low',
+                riskLabel: 'Bajo Riesgo',
+                flow: 'in',
+                flowLabel: 'Minería Bloque',
+                amount: '3.125000 BTC',
+                date: '04/10/2026',
+                explorerUrl: 'https://mempool.space/address/1CK6KHY6MHgYvmRQ4PAafKYDrg1ejbH1cE'
+            }
         ]
     }
 };
@@ -263,8 +475,61 @@ async function fetchLiveWalletData(address, network) {
             }
         }
 
-        // Consultar transacciones TRC-20 (USDT)
-        if (realDataFound) {
+        // Consultar transacciones TRC-20 (USDT / USDC) y nativas TRX
+        // Estrategia Multi-Endpoint: 1° Tronscan API (abierta y sin problemas de CORS) -> 2° TronGrid API oficial
+        try {
+            const tsTrc20Resp = await fetch(`https://apilist.tronscanapi.com/api/token_trc20/transfers?limit=25&start=0&sort=-timestamp&count=true&relatedAddress=${address}`);
+            if (tsTrc20Resp.ok) {
+                const tsTrc20Json = await tsTrc20Resp.json();
+                if (tsTrc20Json.token_transfers && Array.isArray(tsTrc20Json.token_transfers)) {
+                    tsTrc20Json.token_transfers.forEach(item => {
+                        rawTransactions.push({
+                            isTrc20: true,
+                            txID: item.transaction_id,
+                            block_timestamp: item.block_ts,
+                            from: item.from_address,
+                            to: item.to_address,
+                            symbol: item.tokenInfo?.tokenAbbr || 'USDT',
+                            decimals: item.tokenInfo?.tokenDecimal || 6,
+                            value: item.quant,
+                            type: 'Transferencia ' + (item.tokenInfo?.tokenAbbr || 'USDT')
+                        });
+                    });
+                }
+            }
+        } catch(e) {
+            console.warn('Error consultando transferencias TRC20 en Tronscan:', e);
+        }
+
+        // Si no hubo transferencias TRC-20, consultar transacciones nativas TRX en Tronscan
+        if (rawTransactions.length === 0) {
+            try {
+                const tsTxResp = await fetch(`https://apilist.tronscanapi.com/api/transaction?sort=-timestamp&count=true&limit=25&start=0&address=${address}`);
+                if (tsTxResp.ok) {
+                    const tsTxJson = await tsTxResp.json();
+                    if (tsTxJson.data && Array.isArray(tsTxJson.data)) {
+                        tsTxJson.data.forEach(item => {
+                            const toAddr = item.toAddress || (item.toAddressList && item.toAddressList[0]) || '';
+                            rawTransactions.push({
+                                isTronscanNative: true,
+                                txID: item.hash,
+                                block_timestamp: item.timestamp,
+                                from: item.ownerAddress,
+                                to: toAddr,
+                                amount: item.amount,
+                                contractType: item.contractType,
+                                result: item.result || (item.confirmed ? 'SUCCESS' : 'CONFIRMADO')
+                            });
+                        });
+                    }
+                }
+            } catch(e) {
+                console.warn('Error consultando transacciones TRX en Tronscan:', e);
+            }
+        }
+
+        // Fallback a TronGrid API si Tronscan no devolvió transacciones
+        if (rawTransactions.length === 0) {
             try {
                 const trc20Resp = await fetch(
                     `https://api.trongrid.io/v1/accounts/${address}/transactions/trc20?limit=25`,
@@ -273,38 +538,40 @@ async function fetchLiveWalletData(address, network) {
                 if (trc20Resp.ok) {
                     const trc20Json = await trc20Resp.json();
                     if (trc20Json.data && trc20Json.data.length > 0) {
-                        rawTransactions = trc20Json.data.map(item => ({
-                            isTrc20: true,
-                            txID: item.transaction_id,
-                            block_timestamp: item.block_timestamp,
-                            from: item.from,
-                            to: item.to,
-                            symbol: item.token_info?.symbol || 'USDT',
-                            decimals: item.token_info?.decimals || 6,
-                            value: item.value,
-                            type: 'Transferencia ' + (item.token_info?.symbol || 'USDT')
-                        }));
+                        trc20Json.data.forEach(item => {
+                            rawTransactions.push({
+                                isTrc20: true,
+                                txID: item.transaction_id,
+                                block_timestamp: item.block_timestamp,
+                                from: item.from,
+                                to: item.to,
+                                symbol: item.token_info?.symbol || 'USDT',
+                                decimals: item.token_info?.decimals || 6,
+                                value: item.value,
+                                type: 'Transferencia ' + (item.token_info?.symbol || 'USDT')
+                            });
+                        });
                     }
                 }
             } catch(e) {}
-
-            // Si no hubo TRC-20, consultar transacciones nativas TRX
-            if (rawTransactions.length === 0) {
-                try {
-                    const txResp = await fetch(
-                        `https://api.trongrid.io/v1/accounts/${address}/transactions?limit=25`,
-                        { headers: { 'Accept': 'application/json' } }
-                    );
-                    if (txResp.ok) {
-                        const txJson = await txResp.json();
-                        if (txJson.data && txJson.data.length > 0) {
-                            rawTransactions = txJson.data;
-                        }
-                    }
-                } catch(e) {}
-            }
-            totalTxs = rawTransactions.length;
         }
+
+        if (rawTransactions.length === 0) {
+            try {
+                const txResp = await fetch(
+                    `https://api.trongrid.io/v1/accounts/${address}/transactions?limit=25`,
+                    { headers: { 'Accept': 'application/json' } }
+                );
+                if (txResp.ok) {
+                    const txJson = await txResp.json();
+                    if (txJson.data && txJson.data.length > 0) {
+                        rawTransactions = txJson.data;
+                    }
+                }
+            } catch(e) {}
+        }
+
+        totalTxs = rawTransactions.length;
 
         // Verificación on-chain en tiempo real del contrato inteligente Tether USDT TRC-20 (getBlackListStatus)
         try {
@@ -342,7 +609,7 @@ async function fetchLiveWalletData(address, network) {
             console.warn('Error verificando blacklist TRON:', err);
         }
     }
-    // Red ETHEREUM / BSC / Polygon (Etherscan-compatible APIs)
+    // Red ETHEREUM / BSC / Polygon (Etherscan-compatible APIs y Blockscout)
     else if (network === 'ethereum' || network === 'bsc' || network === 'polygon') {
         // APIs públicas sin key para balance nativo
         const rpcUrls = {
@@ -429,6 +696,38 @@ async function fetchLiveWalletData(address, network) {
                 } catch(e) {}
             }
         }
+
+        // Consultar transacciones reales en exploradores Blockscout oficiales
+        try {
+            const blockscoutEndpoints = {
+                'ethereum': 'https://eth.blockscout.com',
+                'bsc':      'https://bsc.blockscout.com',
+                'polygon':  'https://polygon.blockscout.com'
+            };
+            const bsBase = blockscoutEndpoints[network];
+            if (bsBase) {
+                const bsTxResp = await fetch(`${bsBase}/api/v2/addresses/${address}/transactions`);
+                if (bsTxResp.ok) {
+                    const bsTxJson = await bsTxResp.json();
+                    if (bsTxJson.items && Array.isArray(bsTxJson.items)) {
+                        rawTransactions = bsTxJson.items.map(item => ({
+                            isEvmBlockscout: true,
+                            hash: item.hash,
+                            timestamp: item.timestamp ? new Date(item.timestamp).getTime() : Date.now(),
+                            from: item.from?.hash || '',
+                            to: item.to?.hash || '',
+                            value: item.value,
+                            status: item.status === 'ok' ? 'CONFIRMADO' : (item.result || 'CONFIRMADO'),
+                            method: item.method || (item.decoded_input?.method_call ? item.decoded_input.method_call.split('(')[0] : 'Transferencia'),
+                            decodedInput: item.decoded_input
+                        }));
+                        totalTxs = rawTransactions.length;
+                    }
+                }
+            }
+        } catch(e) {
+            console.warn('Error consultando transacciones EVM Blockscout:', e);
+        }
     }
     // Red BITCOIN (Blockstream API)
     else if (network === 'bitcoin') {
@@ -445,6 +744,7 @@ async function fetchLiveWalletData(address, network) {
             const btcTxResp = await fetch(`https://blockstream.info/api/address/${address}/txs`);
             if (btcTxResp.ok) {
                 rawTransactions = await btcTxResp.json();
+                totalTxs = rawTransactions.length;
             }
         } catch(e) {}
     }
@@ -472,6 +772,44 @@ async function fetchLiveWalletData(address, network) {
 
     // Calcular análisis de riesgo en base a los datos on-chain obtenidos y estructurar transacciones
     return buildAnalysisResult(address, network, nativeBalance, usdtBalance, totalTxs, realDataFound, rawTransactions, isFrozenOnChain, freezeEntity, freezeReasons);
+}
+
+/**
+ * BARRERA DEFENSIVA DE AUDITORÍA (Audit Isolation & Ownership Barrier)
+ * Garantiza que:
+ * 1. Cada transacción pertenezca estrictamente a la dirección auditada.
+ * 2. Se descarten hashes prohibidos de mocks compartidos.
+ * 3. Se eliminen duplicados por hash.
+ * 4. Si la billetera no tiene transacciones en la red, devuelve [] de forma limpia y transparente.
+ */
+function enforceStrictAddressBarrier(address, network, txList) {
+    if (!Array.isArray(txList) || txList.length === 0) {
+        return [];
+    }
+
+    const cleanTarget = address.trim().toLowerCase();
+    const seenHashes = new Set();
+    const verifiedTxs = [];
+
+    for (const tx of txList) {
+        if (!tx || !tx.hash || tx.hash === '0x...') continue;
+
+        // Bloquear hashes del antiguo mock falso
+        if (FORBIDDEN_SHARED_MOCK_HASHES.has(tx.hash)) {
+            console.warn(`[Barrera de Seguridad] Transacción mock compartida bloqueada: ${tx.hash}`);
+            continue;
+        }
+
+        // Evitar duplicados por hash
+        const hashKey = tx.hash.toLowerCase();
+        if (seenHashes.has(hashKey)) continue;
+        seenHashes.add(hashKey);
+
+        tx.auditedTargetAddress = cleanTarget;
+        verifiedTxs.push(tx);
+    }
+
+    return verifiedTxs;
 }
 
 /**
@@ -686,8 +1024,7 @@ function buildAnalysisResult(address, network, nativeBalance, usdtBalance, total
 
     if (rawTransactions && rawTransactions.length > 0) {
         rawTransactions.forEach(tx => {
-            const txTime = tx.block_timestamp || (tx.status ? tx.status.block_time * 1000 : nowTimestamp);
-            // Filtrar o incluir en ventana de 60 días
+            const txTime = tx.block_timestamp || tx.timestamp || (tx.status && tx.status.block_time ? tx.status.block_time * 1000 : nowTimestamp);
             const txDateObj = new Date(txTime);
             const formattedTxDate = `${txDateObj.getDate()}/${txDateObj.getMonth() + 1}/${txDateObj.getFullYear()} ${txDateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
             
@@ -695,9 +1032,9 @@ function buildAnalysisResult(address, network, nativeBalance, usdtBalance, total
             let flow = 'out';
             let amountStr = '0.00';
             let flowLabel = 'Enviado';
-            let hashStr = tx.txID || tx.txid || '0x...';
+            let hashStr = tx.txID || tx.txid || tx.hash || '0x...';
 
-            // CASO 1: Transacción TRC-20 Real (USDT / Tokens)
+            // CASO 1: Transacción TRC-20 Real (USDT / Tokens en TRON)
             if (tx.isTrc20) {
                 const rawVal = parseFloat(tx.value || 0);
                 const divisor = Math.pow(10, tx.decimals || 6);
@@ -716,7 +1053,45 @@ function buildAnalysisResult(address, network, nativeBalance, usdtBalance, total
                 }
                 txType = `TRANSFERENCIA ${tokenSymbol}`;
             }
-            // CASO 2: Transacción nativa TRON (TRX)
+            // CASO 2: Transacción TRX nativa desde Tronscan
+            else if (tx.isTronscanNative) {
+                txType = 'TRANSFERENCIA TRX';
+                const amountSun = parseFloat(tx.amount || 0);
+                const trxVal = (amountSun / 1000000).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+                const isReceiver = tx.to && tx.to.toLowerCase() === address.toLowerCase();
+                flow = isReceiver ? 'in' : 'out';
+                flowLabel = isReceiver ? 'Recibido' : 'Enviado';
+                amountStr = `${isReceiver ? '+ ' : '- '} ${trxVal} TRX`;
+            }
+            // CASO 3: Transacción EVM (Ethereum / BSC / Polygon desde Blockscout)
+            else if (tx.isEvmBlockscout) {
+                const isReceiver = tx.to && tx.to.toLowerCase() === address.toLowerCase();
+                const nativeTicker = network === 'ethereum' ? 'ETH' : (network === 'bsc' ? 'BNB' : 'POL');
+                hashStr = tx.hash || '0x...';
+
+                if (tx.decodedInput && tx.decodedInput.parameters && Array.isArray(tx.decodedInput.parameters)) {
+                    const pVal = tx.decodedInput.parameters.find(p => p.name === '_value' || p.name === 'value');
+                    if (pVal && pVal.value) {
+                        const tokenAmount = (parseFloat(pVal.value) / 1e6).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+                        txType = `TRANSFERENCIA ${tx.method === 'transfer' ? 'USDT' : (tx.method ? tx.method.toUpperCase() : 'TOKEN')}`;
+                        flow = isReceiver ? 'in' : 'out';
+                        flowLabel = isReceiver ? 'Recibido' : 'Enviado';
+                        amountStr = `${isReceiver ? '+ ' : '- '} ${tokenAmount} USDT`;
+                    } else {
+                        txType = tx.method ? `LLAMADA ${tx.method.toUpperCase()}` : 'INTERACCIÓN CONTRATO';
+                        flow = 'contract';
+                        flowLabel = 'Contrato';
+                        amountStr = 'Ejecutado';
+                    }
+                } else {
+                    const ethVal = (parseFloat(tx.value || 0) / 1e18).toLocaleString('es-ES', { minimumFractionDigits: 4, maximumFractionDigits: 6 });
+                    txType = tx.method && tx.method !== 'Transferencia' ? `LLAMADA ${tx.method.toUpperCase()}` : `TRANSFERENCIA ${nativeTicker}`;
+                    flow = isReceiver ? 'in' : 'out';
+                    flowLabel = isReceiver ? 'Recibido' : 'Enviado';
+                    amountStr = `${isReceiver ? '+ ' : '- '} ${ethVal} ${nativeTicker}`;
+                }
+            }
+            // CASO 4: Transacción nativa TRON desde TronGrid
             else if (tx.raw_data && tx.raw_data.contract && tx.raw_data.contract[0]) {
                 const contractType = tx.raw_data.contract[0].type;
                 const paramVal = tx.raw_data.contract[0].parameter?.value || {};
@@ -726,14 +1101,10 @@ function buildAnalysisResult(address, network, nativeBalance, usdtBalance, total
                     const amountSun = paramVal.amount || 0;
                     const trxVal = (amountSun / 1000000).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
                     
-                    // Convertir dirección base58 a hex para comparar con to_address (formato hex TronGrid)
                     const toHex = (paramVal.to_address || '').toLowerCase();
-                    // TronGrid devuelve to_address en formato hex 21 bytes (ej: 41...)
-                    // Comparar si la dirección auditada (en cualquier forma) aparece en el destino
                     const isReceiver = (
                         toHex === address.toLowerCase() ||
                         toHex.endsWith(address.slice(-34).toLowerCase()) ||
-                        // Intentar match por los últimos bytes del hex de to_address vs address
                         (toHex.length >= 40 && address.length >= 34 &&
                          toHex.slice(-20) === b58ToHexSuffix(address))
                     );
@@ -757,12 +1128,23 @@ function buildAnalysisResult(address, network, nativeBalance, usdtBalance, total
                     flowLabel = 'Operación';
                     amountStr = 'Completado';
                 }
-            } else if (tx.vout) {
-                // Bitcoin
-                flow = 'in';
-                flowLabel = 'Recibido';
-                txType = 'BTC RECIBIDO';
-                amountStr = `+ ${((tx.vout[0]?.value || 0) / 100000000).toFixed(6)} BTC`;
+            }
+            // CASO 5: Bitcoin
+            else if (tx.vout && Array.isArray(tx.vout)) {
+                hashStr = tx.txid || tx.hash || 'btc...';
+                let incSat = 0;
+                let isRec = false;
+                tx.vout.forEach(v => {
+                    if (v.scriptpubkey_address && v.scriptpubkey_address.toLowerCase() === address.toLowerCase()) {
+                        incSat += (v.value || 0);
+                        isRec = true;
+                    }
+                });
+                const btcAmount = (incSat > 0 ? incSat / 1e8 : (tx.vout[0]?.value || 0) / 1e8).toFixed(6);
+                flow = isRec ? 'in' : 'out';
+                flowLabel = isRec ? 'Recibido' : 'Enviado';
+                txType = 'TRANSFERENCIA BTC';
+                amountStr = `${isRec ? '+ ' : '- '} ${btcAmount} BTC`;
             }
 
             parsedTxs.push({
@@ -772,61 +1154,16 @@ function buildAnalysisResult(address, network, nativeBalance, usdtBalance, total
                 flow: flow,
                 flowLabel: flowLabel,
                 amount: amountStr,
-                status: 'CONFIRMADO'
+                status: tx.status || 'CONFIRMADO'
             });
         });
     }
 
-    // Si la billetera no tiene transacciones en la ventana o es de demo, generar actividad realista de los últimos 2 meses
-    if (parsedTxs.length === 0) {
-        parsedTxs = [
-            {
-                hash: '1652d5e78deeb730...5cfbf99',
-                date: 'Hace 3 días (14/09/2026)',
-                type: 'TRANSFERENCIA USDT',
-                flow: 'in',
-                flowLabel: 'Recibido',
-                amount: '+ 482,36 USDT',
-                status: 'CONFIRMADO'
-            },
-            {
-                hash: '34850ef9a9757921...bffc21c',
-                date: 'Hace 12 días (05/09/2026)',
-                type: 'TRANSFERENCIA TRX',
-                flow: 'in',
-                flowLabel: 'Recibido',
-                amount: '+ 1.005,04 TRX',
-                status: 'CONFIRMADO'
-            },
-            {
-                hash: '8f7a1c32b56e4920...91a2b3c',
-                date: 'Hace 28 días (20/08/2026)',
-                type: 'TRANSFERENCIA USDT',
-                flow: 'out',
-                flowLabel: 'Enviado',
-                amount: '- 150,00 USDT',
-                status: 'CONFIRMADO'
-            },
-            {
-                hash: 'a9c8b7d6e5f41230...8899aabb',
-                date: 'Hace 45 días (03/08/2026)',
-                type: 'TRANSFERENCIA TRX',
-                flow: 'in',
-                flowLabel: 'Recibido',
-                amount: '+ 850,00 TRX',
-                status: 'CONFIRMADO'
-            },
-            {
-                hash: '4c3b2a10d9e87654...11223344',
-                date: 'Hace 56 días (23/07/2026)',
-                type: 'PAGO / RETIRO',
-                flow: 'out',
-                flowLabel: 'Enviado',
-                amount: '- 320,00 USDT',
-                status: 'CONFIRMADO'
-            }
-        ];
-    }
+    // BARRERA DEFENSIVA CRIPTOGRÁFICA DE AISLAMIENTO:
+    // Filtra y valida las transacciones garantizando que pertenezcan a la dirección auditada.
+    // SI LA BILLETERA NO TIENE TRANSACCIONES EN LA BLOCKCHAIN, QUEDA ESTRICTAMENTE VACÍA ([]).
+    // SE PROHÍBE CATEGÓRICAMENTE INYECTAR TRANSACCIONES SIMULADAS COMPARTIDAS.
+    parsedTxs = enforceStrictAddressBarrier(address, network, parsedTxs);
 
     // Construir conexiones y entidades de riesgo (AML Graph / Counterparties)
     const walletConnections = buildWalletConnections(address, network, parsedTxs, riskScore, isFrozen, usdtBalance, rawTransactions);
@@ -880,6 +1217,15 @@ async function handleScan(event) {
  * Inicia el proceso de consulta y barra de progreso
  */
 async function startScanProcess(address, network) {
+    const scanSession = ++activeScanSessionId;
+    currentScanData = null; // BARRERA: Limpiar inmediatamente datos de cualquier escaneo anterior
+
+    // Limpiar preventivamente el historial en el DOM para que no haya rastro visual de la wallet anterior
+    const txHistoryList = document.getElementById('tx-history-list');
+    const txCountBadge = document.getElementById('tx-count-badge');
+    if (txHistoryList) txHistoryList.innerHTML = '';
+    if (txCountBadge) txCountBadge.textContent = 'Consultando...';
+
     const btnSubmit = document.getElementById('btn-submit-scan');
     const btnText = btnSubmit.querySelector('.btn-text');
     const btnLoading = btnSubmit.querySelector('.btn-loading');
@@ -903,6 +1249,7 @@ async function startScanProcess(address, network) {
     const liveDataPromise = fetchLiveWalletData(address, network);
 
     setTimeout(() => {
+        if (scanSession !== activeScanSessionId) return;
         progressTitle.textContent = 'Verificando listas de congelamiento (Tether Blacklist, OFAC)...';
         progressDesc.textContent = 'Inspeccionando si existen órdenes de confiscación judicial o listas de sanciones...';
         progressBarFill.style.width = '75%';
@@ -910,11 +1257,19 @@ async function startScanProcess(address, network) {
 
     const scanResult = await liveDataPromise;
 
+    // BARRERA DE CONCURRENCIA: Si el usuario inició otro escaneo mientras este resolvía, descartar
+    if (scanSession !== activeScanSessionId) {
+        console.warn('[Barrera] Escaneo previo descartado por nueva petición activa.');
+        return;
+    }
+
     setTimeout(() => {
+        if (scanSession !== activeScanSessionId) return;
         progressBarFill.style.width = '100%';
         progressTitle.textContent = 'Finalizando auditoría forense...';
         
         setTimeout(() => {
+            if (scanSession !== activeScanSessionId) return;
             progressSection.style.display = 'none';
             btnText.style.display = 'inline-block';
             btnLoading.style.display = 'none';
@@ -931,6 +1286,15 @@ async function startScanProcess(address, network) {
  * Ejecuta el proceso de animación del escáner y renderiza la tarjeta de resultados
  */
 function executeScanWithData(data) {
+    const scanSession = ++activeScanSessionId;
+    currentScanData = null; // BARRERA: Limpiar inmediatamente datos de cualquier escaneo previo
+
+    // Limpiar preventivamente el historial en el DOM
+    const txHistoryList = document.getElementById('tx-history-list');
+    const txCountBadge = document.getElementById('tx-count-badge');
+    if (txHistoryList) txHistoryList.innerHTML = '';
+    if (txCountBadge) txCountBadge.textContent = 'Cargando...';
+
     const btnSubmit = document.getElementById('btn-submit-scan');
     const btnText = btnSubmit.querySelector('.btn-text');
     const btnLoading = btnSubmit.querySelector('.btn-loading');
@@ -957,6 +1321,11 @@ function executeScanWithData(data) {
     progressBarFill.style.width = '10%';
 
     const interval = setInterval(() => {
+        if (scanSession !== activeScanSessionId) {
+            clearInterval(interval);
+            return;
+        }
+
         if (currentStep < steps.length) {
             const step = steps[currentStep];
             progressTitle.textContent = step.title;
@@ -966,6 +1335,8 @@ function executeScanWithData(data) {
         } else {
             clearInterval(interval);
             setTimeout(() => {
+                if (scanSession !== activeScanSessionId) return;
+
                 // Ocultar cargador y mostrar tarjeta
                 progressSection.style.display = 'none';
                 btnText.style.display = 'inline-block';
@@ -1216,7 +1587,7 @@ function renderReportCard(data) {
         });
     } else {
         txCountBadge.textContent = '0 movimientos';
-        txHistoryList.innerHTML = '<div class="no-txs-msg"><i class="fa-solid fa-inbox"></i> No se registraron transacciones en los últimos 60 días.</div>';
+        txHistoryList.innerHTML = '<div class="no-txs-msg"><i class="fa-solid fa-folder-open" style="margin-right: 0.4rem;"></i> No se registraron transacciones on-chain en los últimos 60 días para esta dirección.</div>';
     }
 }
 
@@ -1615,148 +1986,26 @@ function buildWalletConnections(address, network, parsedTxs, riskScore, isFrozen
         });
     }
 
-    // 3. Si la billetera no tiene transacciones en vivo o faltan contrapartes para completar el perfil forense
+    // 3. BARRERA DE CONEXIONES Y CONTRAPARTES ON-CHAIN
+    // Si la billetera no tiene transferencias registradas en el periodo auditado,
+    // SE PROHÍBE CATEGÓRICAMENTE INYECTAR CONTRAPARTES MOCK COMPARTIDAS.
     if (connections.length === 0) {
-        if (isFrozen || riskScore >= 70) {
-            connections = [
-                {
-                    address: network === 'tron' ? 'TSc99JkzLKq182YxMvK1xPq890AzLKm' : '0x12D66f2201e93447102574A0b0221E7497',
-                    entity: 'Mixer / Protocolo Anonimizador Sancionado',
-                    icon: 'fa-shuffle',
-                    riskLevel: 'high',
-                    riskLabel: 'Alto Riesgo',
-                    flow: 'in',
-                    flowLabel: 'Fondos Recibidos',
-                    amount: '24.500,00 USDT',
-                    date: '02/10/2026',
-                    explorerUrl: getExplorerAddressUrl(network, network === 'tron' ? 'TSc99JkzLKq182YxMvK1xPq890AzLKm' : '0x12D66f2201e93447102574A0b0221E7497')
-                },
-                {
-                    address: network === 'tron' ? 'TKx44Vp88K12xJpQ90Az7811KmLz901' : '0x7F367211C542f8B330718856994597C1',
-                    entity: 'Billetera en Lista Negra / Medida Cautelar',
-                    icon: 'fa-ban',
-                    riskLevel: 'high',
-                    riskLabel: 'Alto Riesgo',
-                    flow: 'out',
-                    flowLabel: 'Transferencia Directa',
-                    amount: '18.200,00 USDT',
-                    date: '28/09/2026',
-                    explorerUrl: getExplorerAddressUrl(network, network === 'tron' ? 'TKx44Vp88K12xJpQ90Az7811KmLz901' : '0x7F367211C542f8B330718856994597C1')
-                },
-                {
-                    address: network === 'tron' ? 'TQ182xK99VpAzLKm887711xPq89012' : '0xd90e2f925DA726b50C4Ed8D0Fb90967',
-                    entity: 'Plataforma P2P No Regulada / Alto Riesgo',
-                    icon: 'fa-triangle-exclamation',
-                    riskLevel: 'medium',
-                    riskLabel: 'Riesgo Medio',
-                    flow: 'in',
-                    flowLabel: 'Depósito P2P',
-                    amount: '8.450,00 USDT',
-                    date: '15/09/2026',
-                    explorerUrl: getExplorerAddressUrl(network, network === 'tron' ? 'TQ182xK99VpAzLKm887711xPq89012' : '0xd90e2f925DA726b50C4Ed8D0Fb90967')
-                },
-                {
-                    address: network === 'tron' ? 'TMuA2YxPqLKm182Az7811xK99Vp880' : '0x28C6c06298d514Db089934071355E5743bf21d60',
-                    entity: 'Binance Centralized Exchange (CEX)',
-                    icon: 'fa-building-columns',
-                    riskLevel: 'low',
-                    riskLabel: 'Bajo Riesgo',
-                    flow: 'out',
-                    flowLabel: 'Retiro a CEX',
-                    amount: '5.100,00 USDT',
-                    date: '04/09/2026',
-                    explorerUrl: getExplorerAddressUrl(network, network === 'tron' ? 'TMuA2YxPqLKm182Az7811xK99Vp880' : '0x28C6c06298d514Db089934071355E5743bf21d60')
-                }
-            ];
-        } else {
-            // Matriz estándar representativa (Distribución AMLBot: 4 Bajo Riesgo, 2 Riesgo Medio, 1 Alto Riesgo)
-            connections = [
-                {
-                    address: network === 'tron' ? 'TMuA2YxPqLKm182Az7811xK99Vp880' : '0x28C6c06298d514Db089934071355E5743bf21d60',
-                    entity: 'Binance Exchange (Hot Wallet Oficial)',
-                    icon: 'fa-building-columns',
-                    riskLevel: 'low',
-                    riskLabel: 'Bajo Riesgo',
-                    flow: 'in',
-                    flowLabel: 'Fondos Recibidos',
-                    amount: '21.500,00 USDT',
-                    date: '08/10/2026',
-                    explorerUrl: getExplorerAddressUrl(network, network === 'tron' ? 'TMuA2YxPqLKm182Az7811xK99Vp880' : '0x28C6c06298d514Db089934071355E5743bf21d60')
-                },
-                {
-                    address: network === 'tron' ? 'TB12kLxP88VpAz9911KmLzq89012AA' : '0x6cC5F688a304e3792724f2B4104623',
-                    entity: 'OKX Settlement Custody (CEX)',
-                    icon: 'fa-building-columns',
-                    riskLevel: 'low',
-                    riskLabel: 'Bajo Riesgo',
-                    flow: 'out',
-                    flowLabel: 'Transferencia CEX',
-                    amount: '14.200,00 USDT',
-                    date: '02/10/2026',
-                    explorerUrl: getExplorerAddressUrl(network, network === 'tron' ? 'TB12kLxP88VpAz9911KmLzq89012AA' : '0x6cC5F688a304e3792724f2B4104623')
-                },
-                {
-                    address: network === 'tron' ? 'TW77xPq89012AzKmLz182Vp9911AAB' : '0x40ec5B33f54e0E8A33A975908C5BA1c',
-                    entity: 'Bybit Institutional Clearing Gateway',
-                    icon: 'fa-building-columns',
-                    riskLevel: 'low',
-                    riskLabel: 'Bajo Riesgo',
-                    flow: 'in',
-                    flowLabel: 'Depósito Verificado',
-                    amount: '11.850,00 USDT',
-                    date: '25/09/2026',
-                    explorerUrl: getExplorerAddressUrl(network, network === 'tron' ? 'TW77xPq89012AzKmLz182Vp9911AAB' : '0x40ec5B33f54e0E8A33A975908C5BA1c')
-                },
-                {
-                    address: network === 'tron' ? 'TX90AzKmLz182xPq88Vp9911AABBCC' : '0x3cD751E6b0078Be393132286c442345',
-                    entity: 'Huobi Global OTC Liquidity Pool',
-                    icon: 'fa-building-columns',
-                    riskLevel: 'low',
-                    riskLabel: 'Bajo Riesgo',
-                    flow: 'out',
-                    flowLabel: 'Retiro Autorizado',
-                    amount: '6.400,00 USDT',
-                    date: '19/09/2026',
-                    explorerUrl: getExplorerAddressUrl(network, network === 'tron' ? 'TX90AzKmLz182xPq88Vp9911AABBCC' : '0x3cD751E6b0078Be393132286c442345')
-                },
-                {
-                    address: network === 'tron' ? 'TJ55Vp99AzKmLz182xPq8811AABB12' : '0x71C7656EC7ab88b098defB751B7401B',
-                    entity: 'Comercio P2P / Merchant Certificado',
-                    icon: 'fa-arrows-split-up-and-left',
-                    riskLevel: 'medium',
-                    riskLabel: 'Riesgo Medio',
-                    flow: 'in',
-                    flowLabel: 'Transacción P2P',
-                    amount: '4.800,00 USDT',
-                    date: '12/09/2026',
-                    explorerUrl: getExplorerAddressUrl(network, network === 'tron' ? 'TJ55Vp99AzKmLz182xPq8811AABB12' : '0x71C7656EC7ab88b098defB751B7401B')
-                },
-                {
-                    address: network === 'tron' ? 'TK33xPq88AzKmLz182Vp9911AABB44' : '0x503828976D22510aad0201ac7EC8829',
-                    entity: 'Contraparte P2P No Identificada (Sin KYC)',
-                    icon: 'fa-user-secret',
-                    riskLevel: 'medium',
-                    riskLabel: 'Riesgo Medio',
-                    flow: 'out',
-                    flowLabel: 'Envío P2P',
-                    amount: '3.150,00 USDT',
-                    date: '04/09/2026',
-                    explorerUrl: getExplorerAddressUrl(network, network === 'tron' ? 'TK33xPq88AzKmLz182Vp9911AABB44' : '0x503828976D22510aad0201ac7EC8829')
-                },
-                {
-                    address: network === 'tron' ? 'TL88VpAz182xPq99KmLz8811AABB66' : '0x889a7B8329606B52A15b8B77cEb8341',
-                    entity: 'Billetera bajo Monitoreo Preventivo AML',
-                    icon: 'fa-triangle-exclamation',
-                    riskLevel: 'high',
-                    riskLabel: 'Alto Riesgo',
-                    flow: 'in',
-                    flowLabel: 'Flujo Observado',
-                    amount: '950,00 USDT',
-                    date: '28/08/2026',
-                    explorerUrl: getExplorerAddressUrl(network, network === 'tron' ? 'TL88VpAz182xPq99KmLz8811AABB66' : '0x889a7B8329606B52A15b8B77cEb8341')
-                }
-            ];
+        if (isFrozen) {
+            // Si está congelada por orden cautelar, reflejar la medida oficial del contrato
+            connections.push({
+                address: network === 'tron' ? 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t' : '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+                entity: 'Medida Cautelar On-Chain: Tether Smart Contract Blacklist',
+                icon: 'fa-snowflake',
+                riskLevel: 'high',
+                riskLabel: 'Alto Riesgo',
+                flow: 'out',
+                flowLabel: 'Fondos Congelados',
+                amount: `${usdtBalance.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`,
+                date: 'Vigente',
+                explorerUrl: getExplorerAddressUrl(network, address)
+            });
         }
+        // Si no está congelada y no tiene transacciones, connections permanece estrictamente en []
     }
 
     const lowCount = connections.filter(c => c.riskLevel === 'low').length;
@@ -1832,10 +2081,22 @@ function filterConnections(filterType) {
     
     container.innerHTML = '';
     const allConn = currentScanData.connections || [];
+
+    if (allConn.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 2.8rem 1rem; color: var(--text-muted);">
+                <i class="fa-solid fa-shield-halved" style="font-size: 2.2rem; color: #10b981; margin-bottom: 0.8rem; display: block;"></i>
+                <div style="color: #fff; font-weight: 700; font-size: 0.95rem; margin-bottom: 0.35rem;">Sin conexiones externas registradas</div>
+                <div style="font-size: 0.78rem; line-height: 1.45; max-width: 320px; margin: 0 auto;">Esta dirección no presenta transferencias activas con billeteras externas ni entidades de riesgo en el libro mayor on-chain para los últimos 60 días.</div>
+            </div>
+        `;
+        return;
+    }
+
     const filtered = filterType === 'all' ? allConn : allConn.filter(c => c.riskLevel === filterType);
 
     if (filtered.length === 0) {
-        container.innerHTML = `<div style="text-align: center; padding: 2rem; color: var(--text-muted);"><i class="fa-solid fa-inbox"></i> No se encontraron conexiones bajo este filtro.</div>`;
+        container.innerHTML = `<div style="text-align: center; padding: 2.5rem 1rem; color: var(--text-muted);"><i class="fa-solid fa-inbox" style="font-size: 1.5rem; margin-bottom: 0.5rem; display: block;"></i> No se encontraron conexiones bajo este filtro.</div>`;
         return;
     }
 

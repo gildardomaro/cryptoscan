@@ -786,6 +786,7 @@ body {
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    min-width: 0;
 }
 
 .tx-flow-icon {
@@ -866,6 +867,7 @@ body {
     flex-direction: column;
     align-items: flex-end;
     gap: 0.25rem;
+    flex-shrink: 0;
 }
 
 .tx-amount-header {
@@ -1653,10 +1655,13 @@ body {
     margin-top: auto;
 }
 
-/* Responsividad */
+/* =========================================
+   RESPONSIVIDAD MOVIL COMPLETA (SMARTPHONES)
+   ========================================= */
 @media (max-width: 640px) {
     .report-wrapper {
-        padding: 1.25rem;
+        padding: 1rem 0.85rem;
+        border-radius: 14px;
     }
     .header-container {
         flex-direction: column;
@@ -1665,6 +1670,251 @@ body {
     }
     .primary-token .token-amount {
         font-size: 1.2rem;
+    }
+
+    /* Historial de Transacciones / Operaciones en Celular */
+    .transactions-history-section {
+        margin: 1.25rem 0;
+        padding-top: 1rem;
+    }
+    .tx-section-header {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 0.5rem;
+        margin-bottom: 0.85rem;
+    }
+    .tx-header-left {
+        gap: 0.2rem;
+    }
+    .tx-timeframe-tag {
+        font-size: 0.7rem;
+    }
+    .tx-count-pill {
+        font-size: 0.7rem;
+        padding: 2px 8px;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+    .transactions-table-container {
+        gap: 0.6rem;
+    }
+
+    /* Tarjeta individual de transacción adaptada a 2 niveles limpios */
+    .tx-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.65rem;
+        padding: 0.8rem 0.85rem;
+        border-radius: 10px;
+    }
+    .tx-item-left {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+    }
+    .tx-flow-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 0.8rem;
+        flex-shrink: 0;
+    }
+    .tx-meta {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+    }
+    .tx-hash-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.4rem;
+        width: 100%;
+    }
+    .tx-hash {
+        font-size: 0.76rem;
+        max-width: 140px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .tx-type-tag {
+        font-size: 0.62rem;
+        padding: 2px 6px;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+    .tx-date {
+        font-size: 0.68rem;
+    }
+
+    /* Renglón inferior con montos destacados y estado, sin recortarse */
+    .tx-item-right {
+        width: 100%;
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        border-top: 1px dashed rgba(255, 255, 255, 0.08);
+        padding-top: 0.55rem;
+        margin-top: 0.1rem;
+        text-align: left;
+    }
+    .tx-status-label {
+        font-size: 0.68rem;
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        white-space: nowrap;
+        order: 1;
+    }
+    .tx-amount-header {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        order: 2;
+    }
+    .tx-flow-badge {
+        font-size: 0.62rem;
+        padding: 2px 6px;
+        white-space: nowrap;
+    }
+    .tx-amount {
+        font-size: 0.88rem;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    /* Widget AMLBot en Celular */
+    .amlbot-widget-card {
+        padding: 1.15rem 1rem;
+        border-radius: 16px;
+        margin: 1.25rem 0;
+    }
+    .amlbot-name {
+        font-size: 0.95rem;
+    }
+    .amlbot-action-btn {
+        padding: 0.75rem 1rem;
+        font-size: 0.85rem;
+    }
+
+    /* Modal de Contrapartes y Operaciones en Móvil */
+    .connections-modal {
+        padding: 0.5rem;
+    }
+    .connections-modal .modal-dialog-content {
+        max-height: 94vh;
+        border-radius: 14px;
+        width: 100%;
+    }
+    .modal-header {
+        padding: 0.85rem 1rem;
+    }
+    .modal-title {
+        font-size: 1rem;
+    }
+    .modal-subtitle {
+        font-size: 0.72rem;
+    }
+    .modal-summary-banner {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+    }
+    .summary-stat-pill {
+        padding: 0.45rem 0.4rem;
+    }
+    .summary-stat-pill .stat-num {
+        font-size: 1rem;
+    }
+    .summary-stat-pill .stat-lbl {
+        font-size: 0.65rem;
+    }
+    .modal-filters-bar {
+        padding: 0.6rem 1rem;
+        gap: 0.35rem;
+    }
+    .filter-chip {
+        padding: 4px 10px;
+        font-size: 0.72rem;
+    }
+    .connections-cards-list {
+        padding: 0.85rem 1rem;
+        max-height: 48vh;
+        gap: 0.65rem;
+    }
+    .connection-item-card {
+        padding: 0.85rem;
+    }
+    .conn-card-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.35rem;
+    }
+    .conn-entity-badge {
+        font-size: 0.8rem;
+    }
+    .conn-risk-pill {
+        font-size: 0.65rem;
+        padding: 2px 6px;
+    }
+    .conn-address-row {
+        font-size: 0.72rem;
+        padding: 0.4rem 0.5rem;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+    }
+    .conn-meta-footer {
+        font-size: 0.72rem;
+        flex-direction: row;
+        justify-content: space-between;
+    }
+    .modal-footer {
+        padding: 0.85rem 1rem;
+        flex-direction: column-reverse;
+        gap: 0.5rem;
+    }
+    .btn-api-settings-toggle,
+    .btn-secondary-modal {
+        width: 100%;
+        text-align: center;
+        justify-content: center;
+    }
+    .api-settings-drawer {
+        padding: 0.85rem 1rem;
+    }
+    .api-input-with-button {
+        flex-direction: column;
+    }
+    .btn-save-api-key {
+        width: 100%;
+    }
+}
+
+@media (max-width: 380px) {
+    .report-wrapper {
+        padding: 0.85rem 0.65rem;
+    }
+    .tx-item {
+        padding: 0.75rem 0.7rem;
+    }
+    .tx-hash {
+        max-width: 110px;
+        font-size: 0.72rem;
+    }
+    .tx-amount {
+        font-size: 0.82rem;
+    }
+    .tx-flow-badge {
+        font-size: 0.58rem;
+    }
+    .tx-item-right {
+        gap: 0.3rem;
     }
 }
 

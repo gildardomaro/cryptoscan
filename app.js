@@ -1189,7 +1189,7 @@ function renderReportCard(data) {
                 amountClass = 'amount-neutral';
             }
 
-            const shortHash = tx.hash.length > 18 ? `${tx.hash.substring(0, 10)}...${tx.hash.substring(tx.hash.length - 6)}` : tx.hash;
+            const shortHash = tx.hash.length > 16 ? `${tx.hash.substring(0, 8)}...${tx.hash.substring(tx.hash.length - 6)}` : tx.hash;
 
             item.innerHTML = `
                 <div class="tx-item-left">
@@ -1198,7 +1198,7 @@ function renderReportCard(data) {
                     </div>
                     <div class="tx-meta">
                         <div class="tx-hash-row">
-                            <span class="tx-hash">${shortHash}</span>
+                            <span class="tx-hash" title="${tx.hash}">${shortHash}</span>
                             <span class="tx-type-tag ${tagClass}">${tx.type}</span>
                         </div>
                         <span class="tx-date"><i class="fa-regular fa-clock"></i> ${tx.date}</span>

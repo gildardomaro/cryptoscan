@@ -450,29 +450,40 @@ async function fetchLiveWalletData(address, network) {
             }
         }
 
-        // Si TronGrid no devolvió datos, intentar con Tronscan API (sin CORS issues)
-        if (!realDataFound) {
-            try {
-                const tronscanResp = await fetch(`https://apilist.tronscanapi.com/api/accountv2?address=${address}`);
-                if (tronscanResp.ok) {
-                    const tsData = await tronscanResp.json();
-                    if (tsData && (tsData.balance !== undefined || tsData.tokenBalances)) {
-                        realDataFound = true;
-                        nativeBalance = (tsData.balance || 0) / 1_000_000;
-                        // Buscar USDT en tokenBalances de Tronscan
-                        if (tsData.trc20token_balances && Array.isArray(tsData.trc20token_balances)) {
-                            const usdtToken = tsData.trc20token_balances.find(t =>
-                                t.tokenId === 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'
-                            );
-                            if (usdtToken) {
-                                usdtBalance = parseFloat(usdtToken.balance || 0) / Math.pow(10, usdtToken.tokenDecimal || 6);
+        // Consulta on-chain DIRECTA al contrato inteligente Tether USDT TRC-20 (balanceOf)
+        // Funciona para cualquier billetera incluso si no está activada en TRX en la tabla principal de TronGrid
+        try {
+            const hexSuffix = b58ToHexSuffix(address);
+            if (hexSuffix && hexSuffix.length === 40) {
+                const param = hexSuffix.padStart(64, '0');
+                const owner = '41' + hexSuffix;
+                const balResp = await fetch('https://api.trongrid.io/wallet/triggerconstantcontract', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contract_address: '41a614f803b6fd780986a42c78ec9c7f77e6ded13c', // Tether USDT TRC-20
+                        function_selector: 'balanceOf(address)',
+                        parameter: param,
+                        owner_address: owner
+                    })
+                });
+                if (balResp.ok) {
+                    const balData = await balResp.json();
+                    if (balData.constant_result && balData.constant_result.length > 0) {
+                        const hexVal = balData.constant_result[0];
+                        if (hexVal && hexVal.length > 0) {
+                            const parsedInt = BigInt('0x' + hexVal);
+                            const contractBal = Number(parsedInt) / 1_000_000;
+                            if (contractBal > 0 || !realDataFound) {
+                                usdtBalance = contractBal;
+                                realDataFound = true;
                             }
                         }
                     }
                 }
-            } catch(e) {
-                console.warn('Error consultando Tronscan:', e);
             }
+        } catch(err) {
+            console.warn('Error consultando balanceOf en contrato Tether TRC-20:', err);
         }
 
         // Consultar transacciones TRC-20 (USDT / USDC) y nativas TRX
@@ -572,6 +583,26 @@ async function fetchLiveWalletData(address, network) {
         }
 
         totalTxs = rawTransactions.length;
+        if (totalTxs > 0) {
+            realDataFound = true;
+            // Doble garantía: si por alguna razón usdtBalance quedó en 0 pero existen transferencias registradas
+            if (usdtBalance === 0) {
+                let netCalculated = 0;
+                rawTransactions.forEach(t => {
+                    if (t.isTrc20) {
+                        const val = parseFloat(t.value || 0) / Math.pow(10, t.decimals || 6);
+                        if (t.to && t.to.toLowerCase() === address.toLowerCase()) {
+                            netCalculated += val;
+                        } else if (t.from && t.from.toLowerCase() === address.toLowerCase()) {
+                            netCalculated -= val;
+                        }
+                    }
+                });
+                if (netCalculated > 0) {
+                    usdtBalance = netCalculated;
+                }
+            }
+        }
 
         // Verificación on-chain en tiempo real del contrato inteligente Tether USDT TRC-20 (getBlackListStatus)
         try {

@@ -1842,7 +1842,7 @@ function filterConnections(filterType) {
     filtered.forEach(c => {
         const card = document.createElement('div');
         card.className = `connection-item-card risk-${c.riskLevel}-card`;
-        const shortAddr = c.address.length > 20 ? `${c.address.substring(0, 10)}...${c.address.substring(c.address.length - 8)}` : c.address;
+        const shortAddr = c.address.length > 18 ? `${c.address.substring(0, 8)}...${c.address.substring(c.address.length - 6)}` : c.address;
         
         card.innerHTML = `
             <div class="conn-card-top">
@@ -1853,7 +1853,7 @@ function filterConnections(filterType) {
                 <span class="conn-risk-pill pill-${c.riskLevel}">${c.riskLabel}</span>
             </div>
             <div class="conn-address-row">
-                <span title="${c.address}">${shortAddr}</span>
+                <span class="conn-address-text" title="${c.address}">${shortAddr}</span>
                 <div class="conn-addr-actions">
                     <button type="button" class="btn-icon-copy" onclick="copyTextToClipboard('${c.address}')" title="Copiar dirección completa">
                         <i class="fa-regular fa-copy"></i>

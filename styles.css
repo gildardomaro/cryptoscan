@@ -275,7 +275,7 @@ body {
     background-color: var(--bg-input);
     border: 1px solid var(--border-color);
     color: var(--text-primary);
-    padding: 0.95rem 3.5rem 0.95rem 2.85rem;
+    padding: 0.95rem 9.5rem 0.95rem 2.85rem;
     border-radius: var(--radius-md);
     font-size: 0.95rem;
     font-family: var(--font-mono);
@@ -288,21 +288,50 @@ body {
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
 }
 
-.btn-paste {
+.input-actions-group {
     position: absolute;
-    right: 0.75rem;
-    background: rgba(255, 255, 255, 0.08);
-    border: none;
-    color: var(--text-secondary);
-    padding: 0.5rem 0.75rem;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s;
+    right: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
 }
 
-.btn-paste:hover {
-    background: rgba(255, 255, 255, 0.15);
+.btn-action-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: var(--text-secondary);
+    padding: 0.48rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-action-icon:hover {
+    background: rgba(255, 255, 255, 0.16);
     color: #fff;
+    transform: translateY(-1px);
+}
+
+.btn-action-qr {
+    background: rgba(37, 99, 235, 0.2);
+    border-color: rgba(59, 130, 246, 0.45);
+    color: #60a5fa;
+}
+
+.btn-action-qr:hover {
+    background: rgba(37, 99, 235, 0.35);
+    border-color: #3b82f6;
+    color: #ffffff;
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.35);
+}
+
+.btn-action-paste {
+    padding: 0.48rem 0.65rem;
 }
 
 .btn-scan {
@@ -2352,6 +2381,701 @@ body {
 }
 
 /* ==========================================================================
+   BANNER DE ATAJO Y MODAL DE ESCÁNER QR (FOTOS / WHATSAPP / CÁMARA)
+   ========================================================================== */
+
+/* Banner de atajo para QR de WhatsApp */
+.qr-shortcut-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.15rem;
+    background: linear-gradient(135deg, rgba(37, 211, 102, 0.08) 0%, rgba(37, 99, 235, 0.12) 100%);
+    border: 1px solid rgba(37, 211, 102, 0.28);
+    border-radius: var(--radius-md);
+    padding: 0.85rem 1.25rem;
+    margin-top: 1.15rem;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.qr-shortcut-banner:hover {
+    background: linear-gradient(135deg, rgba(37, 211, 102, 0.15) 0%, rgba(37, 99, 235, 0.22) 100%);
+    border-color: rgba(37, 211, 102, 0.55);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(37, 211, 102, 0.2);
+}
+
+.qr-shortcut-left {
+    display: flex;
+    align-items: center;
+    gap: 0.95rem;
+    min-width: 0;
+}
+
+.qr-shortcut-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: rgba(37, 211, 102, 0.18);
+    border: 1px solid rgba(37, 211, 102, 0.35);
+    color: #25d366;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    flex-shrink: 0;
+    box-shadow: 0 0 14px rgba(37, 211, 102, 0.25);
+}
+
+.qr-shortcut-texts {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.qr-shortcut-title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: -0.2px;
+}
+
+.qr-shortcut-sub {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.btn-qr-shortcut-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: linear-gradient(135deg, #25d366, #128c7e);
+    color: #0b1512;
+    border: none;
+    font-weight: 700;
+    font-size: 0.85rem;
+    padding: 0.6rem 1.15rem;
+    border-radius: 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 4px 14px rgba(37, 211, 102, 0.35);
+}
+
+.btn-qr-shortcut-cta:hover {
+    transform: scale(1.03);
+    box-shadow: 0 6px 18px rgba(37, 211, 102, 0.5);
+}
+
+/* Modal Escáner QR */
+.qr-modal-dialog {
+    max-width: 620px !important;
+}
+
+.qr-icon-badge {
+    background: rgba(59, 130, 246, 0.18) !important;
+    color: #60a5fa !important;
+    border: 1px solid rgba(59, 130, 246, 0.3) !important;
+}
+
+.qr-modal-body {
+    padding: 1.25rem 1.5rem;
+    overflow-y: auto;
+    max-height: calc(85vh - 140px);
+}
+
+/* Pestañas de selección: Archivo vs Cámara */
+.qr-tabs-nav {
+    display: flex;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 4px;
+    gap: 4px;
+    margin-bottom: 1.25rem;
+}
+
+.qr-tab-btn {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 0.65rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.qr-tab-btn:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.qr-tab-btn.active {
+    background: #2563eb;
+    color: #ffffff;
+    box-shadow: 0 2px 10px rgba(37, 99, 235, 0.35);
+}
+
+/* Dropzone de Carga de Archivo */
+.qr-dropzone {
+    border: 2px dashed rgba(59, 130, 246, 0.45);
+    background: rgba(15, 23, 42, 0.6);
+    border-radius: 16px;
+    padding: 2.25rem 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.qr-dropzone:hover {
+    border-color: #3b82f6;
+    background: rgba(30, 58, 138, 0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(37, 99, 235, 0.15);
+}
+
+.qr-dropzone.drag-active {
+    border-color: #25d366;
+    background: rgba(37, 211, 102, 0.12);
+    transform: scale(1.015);
+    box-shadow: 0 0 25px rgba(37, 211, 102, 0.25);
+}
+
+.qr-upload-graphic {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 1.15rem;
+}
+
+.icon-bubble {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.45rem;
+    transition: transform 0.2s;
+}
+
+.bubble-wa {
+    background: rgba(37, 211, 102, 0.15);
+    border: 1px solid rgba(37, 211, 102, 0.35);
+    color: #25d366;
+    box-shadow: 0 0 16px rgba(37, 211, 102, 0.25);
+}
+
+.bubble-qr {
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    color: #60a5fa;
+    box-shadow: 0 0 16px rgba(59, 130, 246, 0.25);
+}
+
+.icon-connector {
+    color: var(--text-muted);
+    font-size: 1rem;
+}
+
+.qr-dropzone h4 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 0.4rem;
+}
+
+.qr-dropzone-desc {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+    max-width: 420px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.qr-dropzone-tip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 0.4rem 0.85rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: 1.25rem;
+}
+
+.qr-dropzone-tip strong {
+    color: #60a5fa;
+}
+
+.btn-choose-file {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: #fff;
+    border: none;
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 0.65rem 1.4rem;
+    border-radius: 10px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+    transition: all 0.2s;
+}
+
+.btn-choose-file:hover {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    transform: translateY(-1px);
+}
+
+/* Cámara en Vivo */
+.qr-camera-viewport {
+    position: relative;
+    width: 100%;
+    height: 300px;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #000;
+    border: 1px solid var(--border-color);
+}
+
+.qr-camera-viewport video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.qr-scanner-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 220px;
+    height: 220px;
+    pointer-events: none;
+}
+
+.qr-laser-line {
+    position: absolute;
+    width: 100%;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, #25d366, transparent);
+    box-shadow: 0 0 12px #25d366;
+    animation: qrScanLaser 2s infinite ease-in-out;
+}
+
+@keyframes qrScanLaser {
+    0% { top: 0%; opacity: 0.3; }
+    50% { top: 100%; opacity: 1; }
+    100% { top: 0%; opacity: 0.3; }
+}
+
+.qr-corner {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    border-color: #25d366;
+    border-style: solid;
+}
+
+.qr-corner.top-left { top: 0; left: 0; border-width: 3px 0 0 3px; border-top-left-radius: 8px; }
+.qr-corner.top-right { top: 0; right: 0; border-width: 3px 3px 0 0; border-top-right-radius: 8px; }
+.qr-corner.bottom-left { bottom: 0; left: 0; border-width: 0 0 3px 3px; border-bottom-left-radius: 8px; }
+.qr-corner.bottom-right { bottom: 0; right: 0; border-width: 0 3px 3px 0; border-bottom-right-radius: 8px; }
+
+.qr-camera-loading {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 20, 34, 0.85);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    color: #60a5fa;
+    font-size: 0.9rem;
+}
+
+.qr-camera-controls {
+    display: flex;
+    justify-content: center;
+    margin-top: 0.85rem;
+}
+
+.btn-camera-flip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-color);
+    color: #fff;
+    padding: 0.55rem 1.15rem;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-camera-flip:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+/* Estado de procesamiento */
+.qr-processing-state {
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+}
+
+.qr-processing-radar {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    margin: 0 auto 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #60a5fa;
+    font-size: 1.8rem;
+}
+
+.qr-radar-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 2px solid rgba(96, 165, 250, 0.4);
+    animation: radarPulse 1.6s infinite ease-out;
+}
+
+.qr-processing-state h4 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 0.3rem;
+}
+
+.qr-processing-state p {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+/* Estado de resultado */
+.qr-result-state {
+    animation: fadeInModal 0.25s ease-out;
+}
+
+.qr-result-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 1.15rem;
+    flex-wrap: wrap;
+}
+
+.qr-result-badge-top {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #86efac;
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+
+.qr-auto-copied-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: rgba(34, 197, 94, 0.15);
+    border: 1px solid rgba(34, 197, 94, 0.35);
+    color: #86efac;
+    font-size: 0.76rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+}
+
+.qr-result-preview-row {
+    display: flex;
+    gap: 1.15rem;
+    background: rgba(15, 20, 34, 0.75);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 1.15rem;
+    margin-bottom: 1.25rem;
+    align-items: center;
+}
+
+.qr-thumb-wrapper {
+    width: 120px;
+    height: 120px;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #000;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.qr-thumb-wrapper canvas {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.qr-result-details {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.qr-detail-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.qr-detail-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.qr-network-pill {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-color);
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.qr-address-box {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+}
+
+.qr-address-value {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: #93c5fd;
+    word-break: break-all;
+    flex: 1;
+    line-height: 1.3;
+}
+
+.btn-copy-detected {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: #fff;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.2s;
+}
+
+.btn-copy-detected:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+}
+
+.qr-result-actions {
+    display: flex;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+}
+
+.btn-qr-action-audit {
+    flex: 1.2;
+    min-width: 180px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: #fff;
+    border: none;
+    padding: 0.75rem 1.25rem;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.92rem;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35);
+    transition: all 0.2s;
+}
+
+.btn-qr-action-audit:hover {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.45);
+}
+
+.btn-qr-action-use {
+    flex: 1;
+    min-width: 150px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-color);
+    color: #fff;
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-qr-action-use:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.btn-qr-action-retry {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: var(--text-muted);
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-qr-action-retry:hover {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* Estado de error */
+.qr-error-state {
+    padding: 2rem 1.5rem;
+    text-align: center;
+    background: rgba(239, 68, 68, 0.05);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 14px;
+}
+
+.qr-error-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    margin: 0 auto 1rem;
+}
+
+.qr-error-state h4 {
+    font-size: 1.05rem;
+    color: #fff;
+    margin-bottom: 0.4rem;
+}
+
+.qr-error-state p {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    max-width: 440px;
+    margin: 0 auto 1.25rem;
+}
+
+.qr-error-actions {
+    display: flex;
+    justify-content: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.btn-qr-retry-upload {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    padding: 0.6rem 1.25rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.btn-qr-retry-cam {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-color);
+    color: #fff;
+    padding: 0.6rem 1.15rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.qr-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between !important;
+}
+
+.qr-footer-privacy {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.qr-footer-privacy i {
+    color: #22c55e;
+}
+
+/* ==========================================================================
    RESPONSIVIDAD MOVIL DEFINITIVA (SMARTPHONES Y TABLETS) - CASCADE FINAL
    ========================================================================== */
 
@@ -2700,6 +3424,95 @@ body {
     }
     .btn-save-api-key {
         width: 100% !important;
+    }
+
+    /* Adaptación móvil del buscador y botones de acción agrupados */
+    .input-with-actions input {
+        padding-right: 5.4rem !important;
+    }
+    .qr-btn-text {
+        display: none !important;
+    }
+    .btn-action-icon {
+        padding: 0.45rem 0.55rem !important;
+        font-size: 0.85rem !important;
+    }
+
+    /* Banner WhatsApp en móvil */
+    .qr-shortcut-banner {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 0.75rem !important;
+        padding: 0.85rem !important;
+    }
+    .qr-shortcut-left {
+        gap: 0.65rem !important;
+    }
+    .qr-shortcut-title {
+        font-size: 0.85rem !important;
+        white-space: normal !important;
+    }
+    .btn-qr-shortcut-cta {
+        width: 100% !important;
+        justify-content: center !important;
+        padding: 0.55rem !important;
+    }
+
+    /* Modal Escáner QR en móvil */
+    .qr-modal-dialog {
+        height: 94vh !important;
+        max-height: 94vh !important;
+        display: flex !important;
+        flex-direction: column !important;
+    }
+    .qr-modal-body {
+        padding: 0.95rem !important;
+        flex: 1 !important;
+    }
+    .qr-dropzone {
+        padding: 1.5rem 1rem !important;
+    }
+    .qr-upload-graphic {
+        margin-bottom: 0.75rem !important;
+    }
+    .icon-bubble {
+        width: 40px !important;
+        height: 40px !important;
+        font-size: 1.25rem !important;
+    }
+    .qr-camera-viewport {
+        height: 240px !important;
+    }
+    .qr-result-preview-row {
+        flex-direction: column !important;
+        align-items: center !important;
+        text-align: center !important;
+        padding: 0.85rem !important;
+    }
+    .qr-thumb-wrapper {
+        width: 90px !important;
+        height: 90px !important;
+    }
+    .qr-address-box {
+        padding: 0.45rem !important;
+    }
+    .qr-address-value {
+        font-size: 0.76rem !important;
+    }
+    .qr-result-actions {
+        flex-direction: column !important;
+    }
+    .btn-qr-action-audit, .btn-qr-action-use, .btn-qr-action-retry {
+        width: 100% !important;
+    }
+    .qr-modal-footer {
+        flex-direction: column-reverse !important;
+        gap: 0.5rem !important;
+    }
+    .qr-footer-privacy {
+        font-size: 0.65rem !important;
+        text-align: center !important;
+        justify-content: center !important;
     }
 }
 

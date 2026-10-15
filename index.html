@@ -15,7 +15,9 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- html2pdf.js para exportación directa a PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <link rel="stylesheet" href="styles.css?v=2.2">
+    <!-- jsQR para lectura y decodificación de códigos QR desde imágenes/fotos -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <link rel="stylesheet" href="styles.css?v=2.5">
 </head>
 <body>
     <div class="app-background">
@@ -80,9 +82,15 @@
                                 autocomplete="off"
                                 required
                             >
-                            <button type="button" class="btn-paste" onclick="pasteFromClipboard()" title="Pegar del portapapeles">
-                                <i class="fa-regular fa-clipboard"></i>
-                            </button>
+                            <div class="input-actions-group">
+                                <button type="button" class="btn-action-icon btn-action-qr" id="btn-open-qr" onclick="openQrModal()" title="Escanear QR de billetera desde foto o captura de WhatsApp">
+                                    <i class="fa-solid fa-qrcode"></i>
+                                    <span class="qr-btn-text">Escanear QR</span>
+                                </button>
+                                <button type="button" class="btn-action-icon btn-action-paste" onclick="pasteFromClipboard()" title="Pegar del portapapeles">
+                                    <i class="fa-regular fa-clipboard"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -91,6 +99,23 @@
                         <span class="btn-loading" style="display: none;"><i class="fa-solid fa-circle-notch fa-spin"></i> Auditando...</span>
                     </button>
                 </form>
+
+                <!-- Banner Atajo para QR de WhatsApp / Fotos -->
+                <div class="qr-shortcut-banner" onclick="openQrModal()" role="button" tabindex="0">
+                    <div class="qr-shortcut-left">
+                        <div class="qr-shortcut-icon">
+                            <i class="fa-brands fa-whatsapp"></i>
+                        </div>
+                        <div class="qr-shortcut-texts">
+                            <span class="qr-shortcut-title">¿Tienes una captura o foto de WhatsApp con código QR?</span>
+                            <span class="qr-shortcut-sub">Lee la imagen, extrae la dirección automáticamente y cópiala al portapapeles</span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-qr-shortcut-cta">
+                        <i class="fa-solid fa-camera"></i>
+                        <span>Leer Foto QR</span>
+                    </button>
+                </div>
 
                 <!-- Demos rápidas de prueba -->
                 <div class="quick-demos">
@@ -574,9 +599,171 @@
         </div>
     </div>
 
+    <!-- Modal Escáner QR de Billetera (Captura / Foto / WhatsApp) -->
+    <div id="qr-scanner-modal" class="connections-modal qr-scanner-modal" style="display: none;">
+        <div class="modal-backdrop" onclick="closeQrModal()"></div>
+        <div class="modal-dialog-content qr-modal-dialog">
+            <div class="modal-header">
+                <div class="modal-title-group">
+                    <div class="modal-icon-badge qr-icon-badge">
+                        <i class="fa-solid fa-qrcode"></i>
+                    </div>
+                    <div>
+                        <h3 class="modal-title">Escanear QR de Billetera</h3>
+                        <p class="modal-subtitle">Lee capturas de WhatsApp, fotos de galería o archivos de imagen</p>
+                    </div>
+                </div>
+                <button type="button" class="btn-close-modal" onclick="closeQrModal()">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="qr-modal-body">
+                <!-- Selector de Pestaña: Archivo vs Cámara -->
+                <div class="qr-tabs-nav">
+                    <button type="button" id="tab-btn-file" class="qr-tab-btn active" onclick="switchQrTab('file')">
+                        <i class="fa-regular fa-image"></i> Foto / Captura de WhatsApp
+                    </button>
+                    <button type="button" id="tab-btn-camera" class="qr-tab-btn" onclick="switchQrTab('camera')">
+                        <i class="fa-solid fa-camera"></i> Cámara en Vivo
+                    </button>
+                </div>
+
+                <!-- Pestaña 1: Carga de Archivo / WhatsApp -->
+                <div id="qr-tab-file-content" class="qr-tab-content active">
+                    <div id="qr-dropzone" class="qr-dropzone" onclick="triggerFileInput()" ondragover="handleQrDragOver(event)" ondragleave="handleQrDragLeave(event)" ondrop="handleQrDrop(event)">
+                        <input type="file" id="qr-file-input" accept="image/*" style="display: none;" onchange="handleQrFileSelect(event)">
+                        
+                        <div class="qr-dropzone-content">
+                            <div class="qr-upload-graphic">
+                                <span class="icon-bubble bubble-wa" title="WhatsApp"><i class="fa-brands fa-whatsapp"></i></span>
+                                <span class="icon-connector"><i class="fa-solid fa-arrow-right-arrow-left"></i></span>
+                                <span class="icon-bubble bubble-qr" title="Código QR"><i class="fa-solid fa-qrcode"></i></span>
+                            </div>
+                            <h4>Selecciona o arrastra la captura con el QR</h4>
+                            <p class="qr-dropzone-desc">Sube la foto o captura que te enviaron por WhatsApp (PNG, JPG, WEBP, HEIC)</p>
+                            
+                            <div class="qr-dropzone-tip">
+                                <i class="fa-regular fa-paste"></i>
+                                <span>¿Copiaste la imagen de WhatsApp Web? Solo presiona <strong>Ctrl + V</strong> para pegarla aquí</span>
+                            </div>
+
+                            <button type="button" class="btn-choose-file">
+                                <i class="fa-regular fa-folder-open"></i> Elegir Captura o Foto
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pestaña 2: Cámara en Vivo -->
+                <div id="qr-tab-camera-content" class="qr-tab-content" style="display: none;">
+                    <div class="qr-camera-viewport">
+                        <video id="qr-video" playsinline muted></video>
+                        <div class="qr-scanner-overlay">
+                            <div class="qr-laser-line"></div>
+                            <div class="qr-corner top-left"></div>
+                            <div class="qr-corner top-right"></div>
+                            <div class="qr-corner bottom-left"></div>
+                            <div class="qr-corner bottom-right"></div>
+                        </div>
+                        <div id="qr-camera-loading" class="qr-camera-loading">
+                            <i class="fa-solid fa-circle-notch fa-spin"></i>
+                            <span>Iniciando sensor de cámara...</span>
+                        </div>
+                    </div>
+                    <div class="qr-camera-controls">
+                        <button type="button" class="btn-camera-flip" onclick="toggleCameraFacing()">
+                            <i class="fa-solid fa-arrows-rotate"></i> Cambiar Cámara Frontal / Trasera
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Estado: Procesando / Escaneando Imagen -->
+                <div id="qr-processing-state" class="qr-processing-state" style="display: none;">
+                    <div class="qr-processing-radar">
+                        <div class="qr-radar-ring"></div>
+                        <i class="fa-solid fa-magnifying-glass-chart"></i>
+                    </div>
+                    <h4>Decodificando código QR...</h4>
+                    <p>Inspeccionando patrones y extrayendo dirección de la billetera...</p>
+                </div>
+
+                <!-- Estado: Resultado Encontrado -->
+                <div id="qr-result-state" class="qr-result-state" style="display: none;">
+                    <div class="qr-result-header">
+                        <div class="qr-result-badge-top">
+                            <i class="fa-solid fa-circle-check"></i>
+                            <span>¡Código QR Detectado con Éxito!</span>
+                        </div>
+                        <div class="qr-auto-copied-badge">
+                            <i class="fa-solid fa-clipboard-check"></i> Copiada al portapapeles
+                        </div>
+                    </div>
+
+                    <div class="qr-result-preview-row">
+                        <div class="qr-thumb-wrapper">
+                            <canvas id="qr-canvas-preview"></canvas>
+                        </div>
+                        <div class="qr-result-details">
+                            <div class="qr-detail-group">
+                                <span class="qr-detail-label">Red Blockchain Detectada:</span>
+                                <span class="qr-network-pill" id="qr-detected-network-pill">🔴 TRON Network (TRC-20)</span>
+                            </div>
+                            <div class="qr-detail-group">
+                                <span class="qr-detail-label">Dirección Extraída de la Billetera:</span>
+                                <div class="qr-address-box">
+                                    <span class="qr-address-value" id="qr-detected-address">TVoE57o5xzmR9MMdfNfJTPtSfyt9XjshWJ</span>
+                                    <button type="button" class="btn-copy-detected" onclick="copyDetectedAddress()" title="Copiar nuevamente">
+                                        <i class="fa-regular fa-copy"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="qr-result-actions">
+                        <button type="button" class="btn-qr-action-audit" onclick="applyQrWalletAndScan()">
+                            <i class="fa-solid fa-radar"></i> Auditar Billetera Ahora
+                        </button>
+                        <button type="button" class="btn-qr-action-use" onclick="applyQrWalletOnly()">
+                            <i class="fa-solid fa-arrow-down"></i> Cargar en Buscador
+                        </button>
+                        <button type="button" class="btn-qr-action-retry" onclick="resetQrScanner()">
+                            <i class="fa-solid fa-rotate-left"></i> Otra Imagen
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Estado: Error (No se encontró QR) -->
+                <div id="qr-error-state" class="qr-error-state" style="display: none;">
+                    <div class="qr-error-icon">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <h4>No se detectó un código QR legible</h4>
+                    <p id="qr-error-message">No encontramos un código QR en la imagen. Asegúrate de que la captura no esté muy borrosa, recortada o con reflejos fuertes.</p>
+                    <div class="qr-error-actions">
+                        <button type="button" class="btn-qr-retry-upload" onclick="triggerFileInput()">
+                            <i class="fa-regular fa-image"></i> Probar con Otra Foto
+                        </button>
+                        <button type="button" class="btn-qr-retry-cam" onclick="switchQrTab('camera')">
+                            <i class="fa-solid fa-camera"></i> Usar Cámara
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer qr-modal-footer">
+                <span class="qr-footer-privacy">
+                    <i class="fa-solid fa-shield-halved"></i> 100% Privado: el escaneo se procesa localmente en tu navegador. Tu foto nunca se sube a internet.
+                </span>
+                <button type="button" class="btn-secondary-modal" onclick="closeQrModal()">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Notificación Toast -->
     <div id="toast" class="toast">Mensaje copiado</div>
 
-    <script src="app.js?v=2.4"></script>
+    <script src="app.js?v=2.5"></script>
 </body>
 </html>

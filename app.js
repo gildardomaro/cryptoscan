@@ -2287,4 +2287,685 @@ window.addEventListener('DOMContentLoaded', () => {
     if (walletInput && walletInput.value.trim() !== '') {
         startScanProcess(walletInput.value.trim(), 'tron');
     }
+
+    // Inicializar listener global para pegar imágenes con Ctrl+V (WhatsApp Web)
+    initGlobalPasteQrListener();
 });
+
+/* ==========================================================================
+   MODULO DE ESCANEO DE QR DE BILLETERAS (FOTOS / WHATSAPP / CÁMARA)
+   ========================================================================== */
+
+let qrCameraStream = null;
+let qrCameraFacing = 'environment';
+let qrCameraAnimFrame = null;
+let currentDetectedQrResult = null;
+
+/**
+ * Abre el modal de escaneo de QR
+ */
+function openQrModal() {
+    const modal = document.getElementById('qr-scanner-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    switchQrTab('file');
+    resetQrScanner();
+}
+
+/**
+ * Cierra el modal de escaneo de QR y detiene la cámara si está activa
+ */
+function closeQrModal() {
+    const modal = document.getElementById('qr-scanner-modal');
+    if (modal) modal.style.display = 'none';
+    document.body.style.overflow = '';
+    stopCameraScanner();
+}
+
+/**
+ * Alterna entre pestañas: 'file' (foto/WhatsApp) o 'camera' (en vivo)
+ */
+function switchQrTab(tabName) {
+    const fileTabBtn = document.getElementById('tab-btn-file');
+    const camTabBtn = document.getElementById('tab-btn-camera');
+    const fileContent = document.getElementById('qr-tab-file-content');
+    const camContent = document.getElementById('qr-tab-camera-content');
+
+    if (tabName === 'camera') {
+        if (fileTabBtn) fileTabBtn.classList.remove('active');
+        if (camTabBtn) camTabBtn.classList.add('active');
+        if (fileContent) fileContent.style.display = 'none';
+        if (camContent) camContent.style.display = 'block';
+        hideQrAuxiliaryStates();
+        startCameraScanner();
+    } else {
+        if (camTabBtn) camTabBtn.classList.remove('active');
+        if (fileTabBtn) fileTabBtn.classList.add('active');
+        if (camContent) camContent.style.display = 'none';
+        if (fileContent) fileContent.style.display = 'block';
+        stopCameraScanner();
+    }
+}
+
+/**
+ * Dispara el selector nativo de archivos
+ */
+function triggerFileInput() {
+    const fileInput = document.getElementById('qr-file-input');
+    if (fileInput) {
+        fileInput.value = '';
+        fileInput.click();
+    }
+}
+
+/**
+ * Manejo de arrastrar y soltar (Drag & Drop)
+ */
+function handleQrDragOver(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const dropzone = document.getElementById('qr-dropzone');
+    if (dropzone) dropzone.classList.add('drag-active');
+}
+
+function handleQrDragLeave(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const dropzone = document.getElementById('qr-dropzone');
+    if (dropzone) dropzone.classList.remove('drag-active');
+}
+
+function handleQrDrop(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const dropzone = document.getElementById('qr-dropzone');
+    if (dropzone) dropzone.classList.remove('drag-active');
+
+    const dt = event.dataTransfer;
+    if (dt && dt.files && dt.files.length > 0) {
+        processQrImageFile(dt.files[0]);
+    }
+}
+
+function handleQrFileSelect(event) {
+    const files = event.target.files;
+    if (files && files.length > 0) {
+        processQrImageFile(files[0]);
+    }
+}
+
+/**
+ * Listener global para Ctrl+V: Si el usuario copia una imagen en WhatsApp Web
+ * y presiona Ctrl+V en cualquier parte de la pantalla, la procesa de inmediato.
+ */
+function initGlobalPasteQrListener() {
+    window.addEventListener('paste', (event) => {
+        // Si el usuario está pegando texto normal en un input o textarea, permitir comportamiento estándar
+        const activeEl = document.activeElement;
+        const isTextInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+
+        const items = (event.clipboardData || event.originalEvent.clipboardData)?.items;
+        if (!items) return;
+
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                const file = items[i].getAsFile();
+                if (file) {
+                    event.preventDefault();
+                    openQrModal();
+                    switchQrTab('file');
+                    processQrImageFile(file);
+                    return;
+                }
+            }
+        }
+    });
+}
+
+/**
+ * Oculta estados secundarios del modal
+ */
+function hideQrAuxiliaryStates() {
+    const processing = document.getElementById('qr-processing-state');
+    const result = document.getElementById('qr-result-state');
+    const error = document.getElementById('qr-error-state');
+    if (processing) processing.style.display = 'none';
+    if (result) result.style.display = 'none';
+    if (error) error.style.display = 'none';
+}
+
+/**
+ * Reinicia la vista del escáner a la zona de carga inicial
+ */
+function resetQrScanner() {
+    stopCameraScanner();
+    hideQrAuxiliaryStates();
+    currentDetectedQrResult = null;
+    const fileContent = document.getElementById('qr-tab-file-content');
+    if (fileContent) fileContent.style.display = 'block';
+    const camContent = document.getElementById('qr-tab-camera-content');
+    if (camContent) camContent.style.display = 'none';
+    const fileTabBtn = document.getElementById('tab-btn-file');
+    const camTabBtn = document.getElementById('tab-btn-camera');
+    if (fileTabBtn) fileTabBtn.classList.add('active');
+    if (camTabBtn) camTabBtn.classList.remove('active');
+}
+
+/**
+ * Procesa un archivo de imagen (captura de WhatsApp, foto, etc.)
+ */
+function processQrImageFile(file) {
+    if (!file || !file.type.startsWith('image/')) {
+        showQrErrorState('El archivo seleccionado no es una imagen válida. Por favor selecciona una captura en formato JPG, PNG o WEBP.');
+        return;
+    }
+
+    // Mostrar estado de procesamiento
+    const fileContent = document.getElementById('qr-tab-file-content');
+    if (fileContent) fileContent.style.display = 'none';
+    const processing = document.getElementById('qr-processing-state');
+    if (processing) processing.style.display = 'block';
+    const resultState = document.getElementById('qr-result-state');
+    if (resultState) resultState.style.display = 'none';
+    const errorState = document.getElementById('qr-error-state');
+    if (errorState) errorState.style.display = 'none';
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = new Image();
+        img.onload = async function() {
+            try {
+                const scanResult = await decodeQrFromImageElement(img);
+                if (scanResult && scanResult.text) {
+                    handleSuccessfulQrDetection(scanResult.text, img, scanResult.location);
+                } else {
+                    showQrErrorState('No encontramos un código QR legible en esta captura. Asegúrate de que el código no esté borroso ni recortado.');
+                }
+            } catch (err) {
+                console.error('Error decodificando QR:', err);
+                showQrErrorState('Ocurrió un error al procesar la imagen: ' + (err.message || err));
+            }
+        };
+        img.onerror = function() {
+            showQrErrorState('No se pudo cargar la imagen seleccionada.');
+        };
+        img.src = e.target.result;
+    };
+    reader.onerror = function() {
+        showQrErrorState('Error al leer el archivo en el navegador.');
+    };
+    reader.readAsDataURL(file);
+}
+
+/**
+ * Motor de decodificación multi-estrategia para fotos y capturas de WhatsApp
+ */
+async function decodeQrFromImageElement(imgElement) {
+    // Estrategia 1: API nativa del navegador BarcodeDetector (Chrome/Android/Edge)
+    if ('BarcodeDetector' in window) {
+        try {
+            const detector = new BarcodeDetector({ formats: ['qr_code'] });
+            const barcodes = await detector.detect(imgElement);
+            if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                return {
+                    text: barcodes[0].rawValue,
+                    location: barcodes[0].cornerPoints || null
+                };
+            }
+        } catch (e) {
+            console.warn('BarcodeDetector error, fallback a jsQR:', e);
+        }
+    }
+
+    // Estrategia 2: jsQR en Canvas
+    if (typeof jsQR === 'undefined') {
+        throw new Error('La biblioteca jsQR no está disponible. Verifica la conexión a internet.');
+    }
+
+    const origW = imgElement.naturalWidth || imgElement.width;
+    const origH = imgElement.naturalHeight || imgElement.height;
+    if (!origW || !origH) return null;
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+    // Definición de escalas y recortes para máxima compatibilidad con capturas de WhatsApp
+    const testCases = [];
+
+    // 1. Escala reducida optimizada (máx 1100px) para remover ruido de compresión de WhatsApp
+    const maxDim = 1100;
+    if (origW > maxDim || origH > maxDim) {
+        const ratio = Math.min(maxDim / origW, maxDim / origH);
+        const tw = Math.round(origW * ratio);
+        const th = Math.round(origH * ratio);
+        testCases.push({ w: tw, h: th, sx: 0, sy: 0, sw: origW, sh: origH, inv: "dontInvert" });
+        testCases.push({ w: tw, h: th, sx: 0, sy: 0, sw: origW, sh: origH, inv: "attemptBoth" });
+    }
+
+    // 2. Tamaño original sin pérdida
+    testCases.push({ w: origW, h: origH, sx: 0, sy: 0, sw: origW, sh: origH, inv: "dontInvert" });
+    testCases.push({ w: origW, h: origH, sx: 0, sy: 0, sw: origW, sh: origH, inv: "attemptBoth" });
+
+    // 3. Recorte central del 80% (típico en capturas de celular donde el QR está en el centro)
+    if (origH > origW * 1.25) {
+        const cropW = Math.round(origW * 0.85);
+        const cropH = Math.round(origW * 0.85);
+        const cropX = Math.round((origW - cropW) / 2);
+        const cropY = Math.round((origH - cropH) / 2);
+        testCases.push({ w: 800, h: 800, sx: cropX, sy: cropY, sw: cropW, sh: cropH, inv: "attemptBoth" });
+    }
+
+    for (const tc of testCases) {
+        canvas.width = tc.w;
+        canvas.height = tc.h;
+        ctx.drawImage(imgElement, tc.sx, tc.sy, tc.sw, tc.sh, 0, 0, tc.w, tc.h);
+        const imgData = ctx.getImageData(0, 0, tc.w, tc.h);
+        const code = jsQR(imgData.data, tc.w, tc.h, { inversionAttempts: tc.inv });
+        if (code && code.data && code.data.trim()) {
+            return {
+                text: code.data,
+                location: code.location
+            };
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Extrae y normaliza la dirección de la billetera y la red desde el texto del QR
+ */
+function extractWalletFromQrData(rawStr) {
+    if (!rawStr || typeof rawStr !== 'string') return null;
+    let str = rawStr.trim();
+    let detectedNetwork = null;
+    let address = '';
+
+    // 1. Detección de esquemas URI (tron:, ethereum:, bitcoin:, solana:, bsc:, polygon:)
+    const uriMatch = str.match(/^([a-zA-Z0-9_\-]+):([^?#\s]+)/i);
+    if (uriMatch) {
+        const scheme = uriMatch[1].toLowerCase();
+        let candidate = uriMatch[2].replace(/^\/+/, ''); // quitar // si existiera
+
+        if (scheme === 'tron' || scheme === 'trx') {
+            detectedNetwork = 'tron';
+            address = candidate;
+        } else if (scheme === 'ethereum' || scheme === 'eth') {
+            detectedNetwork = 'ethereum';
+            address = candidate;
+        } else if (scheme === 'bitcoin' || scheme === 'btc') {
+            detectedNetwork = 'bitcoin';
+            address = candidate;
+        } else if (scheme === 'solana' || scheme === 'sol') {
+            detectedNetwork = 'solana';
+            address = candidate;
+        } else if (scheme === 'bsc' || scheme === 'binance') {
+            detectedNetwork = 'bsc';
+            address = candidate;
+        } else if (scheme === 'polygon' || scheme === 'matic') {
+            detectedNetwork = 'polygon';
+            address = candidate;
+        } else {
+            address = candidate;
+        }
+    } else {
+        // 2. Detección de URLs de exploradores on-chain
+        const urlMatch = str.match(/https?:\/\/[^\s]+/i);
+        if (urlMatch) {
+            const urlStr = urlMatch[0];
+            const tronscan = urlStr.match(/tronscan\.org\/#\/address\/([A-Za-z0-9]{34})/i);
+            const etherscan = urlStr.match(/etherscan\.io\/address\/(0x[a-fA-F0-9]{40})/i);
+            const bscscan = urlStr.match(/bscscan\.com\/address\/(0x[a-fA-F0-9]{40})/i);
+            const solscan = urlStr.match(/solscan\.io\/account\/([A-Za-z0-9]{32,44})/i);
+
+            if (tronscan) {
+                address = tronscan[1];
+                detectedNetwork = 'tron';
+            } else if (etherscan) {
+                address = etherscan[1];
+                detectedNetwork = 'ethereum';
+            } else if (bscscan) {
+                address = bscscan[1];
+                detectedNetwork = 'bsc';
+            } else if (solscan) {
+                address = solscan[1];
+                detectedNetwork = 'solana';
+            }
+        }
+    }
+
+    if (!address) {
+        address = str;
+    }
+
+    // Limpiar fragmentos, query params (?amount=..., etc.)
+    address = address.split('?')[0].split('&')[0].split('#')[0].trim();
+
+    // 3. Regex específicos por tipo de criptomoneda
+    // TRON (empieza con T, 34 caracteres Base58)
+    const tronMatch = address.match(/\b(T[1-9A-HJ-NP-za-km-z]{33})\b/);
+    if (tronMatch) {
+        return { address: tronMatch[1], network: detectedNetwork || 'tron' };
+    }
+
+    // EVM: Ethereum, BSC, Polygon (0x + 40 caracteres hex)
+    const evmMatch = address.match(/\b(0x[a-fA-F0-9]{40})\b/);
+    if (evmMatch) {
+        return { address: evmMatch[1], network: detectedNetwork || 'ethereum' };
+    }
+
+    // Bitcoin: Segwit (bc1...) o Legacy (1 o 3, 26-35 caracteres)
+    const btcSegwit = address.match(/\b(bc1[a-z0-9]{25,62})\b/i);
+    const btcLegacy = address.match(/\b([13][a-km-zA-HJ-NP-Z1-9]{25,34})\b/);
+    if (btcSegwit) {
+        return { address: btcSegwit[1], network: detectedNetwork || 'bitcoin' };
+    }
+    if (btcLegacy) {
+        return { address: btcLegacy[1], network: detectedNetwork || 'bitcoin' };
+    }
+
+    // Solana: 32 a 44 caracteres Base58 (no comenzando con T para evitar confusión con TRON)
+    const solMatch = address.match(/\b([1-9A-HJ-NP-za-km-z]{32,44})\b/);
+    if (solMatch && !solMatch[1].startsWith('T')) {
+        return { address: solMatch[1], network: detectedNetwork || 'solana' };
+    }
+
+    // Si tiene al menos 26 caracteres alfanuméricos, devolverlo como candidato limpio
+    const genericClean = address.replace(/[^a-zA-Z0-9]/g, '');
+    if (genericClean.length >= 26) {
+        return { address: genericClean, network: detectedNetwork || 'auto' };
+    }
+
+    return null;
+}
+
+/**
+ * Retorna etiqueta visual amigable de la red detectada
+ */
+function getNetworkDisplayName(network) {
+    if (network === 'tron') return '🔴 TRON Network (TRC-20)';
+    if (network === 'ethereum') return '🔵 Ethereum (ERC-20)';
+    if (network === 'bitcoin') return '🟠 Bitcoin Network (BTC)';
+    if (network === 'solana') return '🟣 Solana Network (SPL)';
+    if (network === 'bsc') return '🟡 BNB Chain (BEP-20)';
+    if (network === 'polygon') return '🔷 Polygon (POL)';
+    return '⚡ Red Auto-detectada';
+}
+
+/**
+ * Dibuja la miniatura de la imagen con el QR resaltado
+ */
+function drawQrPreviewThumbnail(imgElement, location) {
+    const canvas = document.getElementById('qr-canvas-preview');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    const maxThumb = 140;
+    const scale = Math.min(maxThumb / imgElement.width, maxThumb / imgElement.height, 1);
+    canvas.width = Math.round(imgElement.width * scale);
+    canvas.height = Math.round(imgElement.height * scale);
+
+    ctx.drawImage(imgElement, 0, 0, canvas.width, canvas.height);
+
+    // Resaltar el código QR con un marco verde neón si tenemos sus esquinas
+    if (location) {
+        ctx.strokeStyle = '#22c55e';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        if (location.topLeftCorner) {
+            // Formato jsQR
+            ctx.moveTo(location.topLeftCorner.x * scale, location.topLeftCorner.y * scale);
+            ctx.lineTo(location.topRightCorner.x * scale, location.topRightCorner.y * scale);
+            ctx.lineTo(location.bottomRightCorner.x * scale, location.bottomRightCorner.y * scale);
+            ctx.lineTo(location.bottomLeftCorner.x * scale, location.bottomLeftCorner.y * scale);
+            ctx.closePath();
+        } else if (Array.isArray(location) && location.length >= 4) {
+            // Formato BarcodeDetector cornerPoints
+            ctx.moveTo(location[0].x * scale, location[0].y * scale);
+            ctx.lineTo(location[1].x * scale, location[1].y * scale);
+            ctx.lineTo(location[2].x * scale, location[2].y * scale);
+            ctx.lineTo(location[3].x * scale, location[3].y * scale);
+            ctx.closePath();
+        }
+        ctx.stroke();
+    }
+}
+
+/**
+ * Gestiona la detección exitosa del QR: copia al portapapeles, muestra vista previa y llena el formulario
+ */
+function handleSuccessfulQrDetection(rawQrString, imgElement, location) {
+    const parsed = extractWalletFromQrData(rawQrString);
+    if (!parsed || !parsed.address) {
+        showQrErrorState('El código QR se leyó correctamente pero no contiene una dirección de billetera cripto reconocida: ' + rawQrString);
+        return;
+    }
+
+    currentDetectedQrResult = parsed;
+
+    // 1. Ocultar estados de carga y error
+    const processing = document.getElementById('qr-processing-state');
+    if (processing) processing.style.display = 'none';
+    const errorState = document.getElementById('qr-error-state');
+    if (errorState) errorState.style.display = 'none';
+
+    // 2. Dibujar previsualización
+    if (imgElement) {
+        drawQrPreviewThumbnail(imgElement, location);
+    }
+
+    // 3. Actualizar textos del resultado
+    const addrEl = document.getElementById('qr-detected-address');
+    if (addrEl) addrEl.textContent = parsed.address;
+
+    const netPill = document.getElementById('qr-detected-network-pill');
+    if (netPill) netPill.textContent = getNetworkDisplayName(parsed.network);
+
+    // 4. Copiar AUTOMÁTICAMENTE la wallet al portapapeles (requisito solicitado)
+    copyTextToClipboardSilently(parsed.address);
+
+    // 5. Cargar en el input de la página principal
+    const walletInput = document.getElementById('wallet-input');
+    if (walletInput) {
+        walletInput.value = parsed.address;
+    }
+    if (parsed.network && parsed.network !== 'auto') {
+        const netSelect = document.getElementById('network-select');
+        if (netSelect) {
+            netSelect.value = parsed.network;
+            handleNetworkChange();
+        }
+    }
+
+    // 6. Mostrar el estado de resultado en el modal
+    const resultState = document.getElementById('qr-result-state');
+    if (resultState) resultState.style.display = 'block';
+
+    showToast('¡QR detectado! Billetera copiada al portapapeles');
+}
+
+/**
+ * Copia silenciosa o con confirmación al portapapeles
+ */
+function copyTextToClipboardSilently(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).catch(() => {});
+    }
+}
+
+function copyDetectedAddress() {
+    if (!currentDetectedQrResult || !currentDetectedQrResult.address) return;
+    copyTextToClipboard(currentDetectedQrResult.address);
+}
+
+/**
+ * Muestra el estado de error en el modal
+ */
+function showQrErrorState(message) {
+    const fileContent = document.getElementById('qr-tab-file-content');
+    if (fileContent) fileContent.style.display = 'none';
+    const processing = document.getElementById('qr-processing-state');
+    if (processing) processing.style.display = 'none';
+    const resultState = document.getElementById('qr-result-state');
+    if (resultState) resultState.style.display = 'none';
+
+    const errorState = document.getElementById('qr-error-state');
+    if (errorState) {
+        errorState.style.display = 'block';
+        const msgEl = document.getElementById('qr-error-message');
+        if (msgEl) msgEl.textContent = message;
+    }
+}
+
+/**
+ * Aplica la billetera extraída y ejecuta el escaneo AML de inmediato
+ */
+function applyQrWalletAndScan() {
+    if (!currentDetectedQrResult || !currentDetectedQrResult.address) return;
+    closeQrModal();
+    const form = document.getElementById('scanner-form');
+    if (form) {
+        if (typeof form.requestSubmit === 'function') {
+            form.requestSubmit();
+        } else {
+            handleScan(new Event('submit'));
+        }
+    }
+}
+
+/**
+ * Aplica la billetera en el input sin iniciar el escaneo todavía
+ */
+function applyQrWalletOnly() {
+    if (!currentDetectedQrResult || !currentDetectedQrResult.address) return;
+    closeQrModal();
+    showToast('Billetera cargada en el buscador');
+}
+
+/* ==========================================================================
+   ESCÁNER EN VIVO CON CÁMARA WEB / CELULAR
+   ========================================================================== */
+
+/**
+ * Inicia la transmisión de la cámara para escaneo en tiempo real
+ */
+async function startCameraScanner() {
+    stopCameraScanner();
+
+    const video = document.getElementById('qr-video');
+    const loading = document.getElementById('qr-camera-loading');
+    if (loading) loading.style.display = 'flex';
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        if (loading) loading.innerHTML = '<span style="color:#f87171;"><i class="fa-solid fa-ban"></i> Tu navegador no permite acceso a la cámara. Usa la opción "Subir Foto".</span>';
+        return;
+    }
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: qrCameraFacing,
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            },
+            audio: false
+        });
+
+        qrCameraStream = stream;
+        if (video) {
+            video.srcObject = stream;
+            video.setAttribute('playsinline', 'true');
+            await video.play();
+            if (loading) loading.style.display = 'none';
+            scanCameraFrameLoop();
+        }
+    } catch (err) {
+        console.warn('Error al activar cámara:', err);
+        if (loading) {
+            loading.innerHTML = '<span style="color:#f87171; text-align:center; padding:1rem;"><i class="fa-solid fa-triangle-exclamation"></i> No se pudo acceder a la cámara.<br><small>Revisa los permisos de tu navegador o sube una captura/foto.</small></span>';
+        }
+    }
+}
+
+/**
+ * Detiene la cámara y cancela el loop de animación
+ */
+function stopCameraScanner() {
+    if (qrCameraAnimFrame) {
+        cancelAnimationFrame(qrCameraAnimFrame);
+        qrCameraAnimFrame = null;
+    }
+    if (qrCameraStream) {
+        qrCameraStream.getTracks().forEach(track => track.stop());
+        qrCameraStream = null;
+    }
+    const video = document.getElementById('qr-video');
+    if (video) {
+        video.srcObject = null;
+    }
+}
+
+/**
+ * Alterna entre cámara frontal y trasera en celulares
+ */
+function toggleCameraFacing() {
+    qrCameraFacing = (qrCameraFacing === 'environment') ? 'user' : 'environment';
+    startCameraScanner();
+}
+
+/**
+ * Bucle de inspección de fotogramas de la cámara
+ */
+async function scanCameraFrameLoop() {
+    const video = document.getElementById('qr-video');
+    if (!video || !qrCameraStream || video.readyState !== video.HAVE_ENOUGH_DATA) {
+        qrCameraAnimFrame = requestAnimationFrame(scanCameraFrameLoop);
+        return;
+    }
+
+    try {
+        let codeText = null;
+        let location = null;
+
+        if ('BarcodeDetector' in window) {
+            const detector = new BarcodeDetector({ formats: ['qr_code'] });
+            const barcodes = await detector.detect(video);
+            if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                codeText = barcodes[0].rawValue;
+                location = barcodes[0].cornerPoints || null;
+            }
+        }
+
+        if (!codeText && typeof jsQR !== 'undefined') {
+            const offCanvas = document.createElement('canvas');
+            const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
+            offCanvas.width = video.videoWidth;
+            offCanvas.height = video.videoHeight;
+            offCtx.drawImage(video, 0, 0, offCanvas.width, offCanvas.height);
+            const imgData = offCtx.getImageData(0, 0, offCanvas.width, offCanvas.height);
+            const qrResult = jsQR(imgData.data, offCanvas.width, offCanvas.height, { inversionAttempts: "dontInvert" });
+            if (qrResult && qrResult.data) {
+                codeText = qrResult.data;
+                location = qrResult.location;
+            }
+        }
+
+        if (codeText) {
+            // Congelar fotograma para miniatura
+            const snapCanvas = document.createElement('canvas');
+            snapCanvas.width = video.videoWidth;
+            snapCanvas.height = video.videoHeight;
+            snapCanvas.getContext('2d').drawImage(video, 0, 0);
+
+            stopCameraScanner();
+            const camContent = document.getElementById('qr-tab-camera-content');
+            if (camContent) camContent.style.display = 'none';
+
+            handleSuccessfulQrDetection(codeText, snapCanvas, location);
+            return;
+        }
+    } catch (e) {}
+
+    qrCameraAnimFrame = requestAnimationFrame(scanCameraFrameLoop);
+}

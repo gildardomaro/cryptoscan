@@ -3547,3 +3547,169 @@ body {
         font-size: 0.5rem !important;
     }
 }
+
+/* ==========================================================================
+   SECCIÓN: ACUMULADO TOTAL DE INGRESOS HISTÓRICOS (DESDE LA CREACIÓN)
+   ========================================================================== */
+
+.all-time-inflow-container {
+    margin-top: 1.25rem;
+    background: linear-gradient(145deg, rgba(16, 185, 129, 0.06) 0%, rgba(15, 23, 42, 0.85) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.22);
+    border-radius: 14px;
+    padding: 1.25rem 1.5rem;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 0 15px rgba(16, 185, 129, 0.08);
+    position: relative;
+    overflow: hidden;
+}
+
+.all-time-inflow-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #10b981, #06b6d4, #3b82f6);
+}
+
+.all-time-inflow-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1.15rem;
+    padding-bottom: 0.85rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.all-time-inflow-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+}
+
+.inflow-icon-circle {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    color: #10b981;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.all-time-inflow-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #f8fafc;
+    margin: 0;
+    letter-spacing: -0.01em;
+}
+
+.all-time-inflow-subtitle {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    margin: 0.2rem 0 0 0;
+}
+
+.inflow-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 9999px;
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: #34d399;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.all-time-inflow-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+.inflow-metric-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 1rem 1.15rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    transition: all 0.25s ease;
+}
+
+.inflow-metric-card:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(16, 185, 129, 0.4);
+    transform: translateY(-2px);
+}
+
+.inflow-metric-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.inflow-metric-label i {
+    color: #10b981;
+    font-size: 0.9rem;
+}
+
+.inflow-metric-value {
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: #34d399;
+    letter-spacing: -0.02em;
+    word-break: break-all;
+}
+
+.inflow-metric-card.native-inflow .inflow-metric-value {
+    color: #60a5fa;
+}
+
+.inflow-metric-card.native-inflow .inflow-metric-label i {
+    color: #60a5fa;
+}
+
+.inflow-metric-card.count-inflow .inflow-metric-value {
+    color: #f1f5f9;
+}
+
+.inflow-metric-card.count-inflow .inflow-metric-label i {
+    color: #f59e0b;
+}
+
+.inflow-metric-hint {
+    font-size: 0.72rem;
+    color: #64748b;
+    margin-top: 0.2rem;
+}
+
+@media (max-width: 900px) {
+    .all-time-inflow-grid {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+    .all-time-inflow-container {
+        padding: 1rem;
+    }
+    .inflow-metric-value {
+        font-size: 1.15rem;
+    }
+}
+

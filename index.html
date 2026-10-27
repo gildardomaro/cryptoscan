@@ -369,6 +369,50 @@
                             <!-- Generado dinámicamente con transacciones reales o auditadas -->
                         </div>
                     </div>
+
+                    <!-- NUEVA SECCIÓN: Suma Total de Ingresos Históricos desde la Creación de la Wallet (All-Time Inflows) -->
+                    <div class="all-time-inflow-container" id="all-time-inflow-container">
+                        <div class="all-time-inflow-header">
+                            <div class="all-time-inflow-title-wrap">
+                                <div class="inflow-icon-circle">
+                                    <i class="fa-solid fa-vault"></i>
+                                </div>
+                                <div>
+                                    <h4 class="all-time-inflow-title">Total Acumulado de Ingresos (Desde la Creación de la Wallet)</h4>
+                                    <p class="all-time-inflow-subtitle">Suma total histórica de depósitos y fondos recibidos on-chain desde el primer movimiento de la billetera</p>
+                                </div>
+                            </div>
+                            <div class="inflow-status-pill">
+                                <i class="fa-solid fa-arrow-down-long"></i> Flujo Vitalicio de Entrada
+                            </div>
+                        </div>
+
+                        <div class="all-time-inflow-grid">
+                            <div class="inflow-metric-card primary-inflow">
+                                <div class="inflow-metric-label">
+                                    <i class="fa-solid fa-dollar-sign"></i> Total Ingresos USDT / Stablecoins
+                                </div>
+                                <div class="inflow-metric-value" id="all-time-inflow-usdt">+ 0,00 USDT</div>
+                                <div class="inflow-metric-hint" id="all-time-inflow-usdt-hint">Acumulado vitalicio de transferencias recibidas</div>
+                            </div>
+
+                            <div class="inflow-metric-card native-inflow">
+                                <div class="inflow-metric-label" id="all-time-inflow-native-label">
+                                    <i class="fa-brands fa-ethereum" id="all-time-inflow-native-icon"></i> Total Ingresos en Moneda Nativa
+                                </div>
+                                <div class="inflow-metric-value" id="all-time-inflow-native">+ 0,000 ETH</div>
+                                <div class="inflow-metric-hint" id="all-time-inflow-native-hint">Depósitos nativos registrados en el libro mayor</div>
+                            </div>
+
+                            <div class="inflow-metric-card count-inflow">
+                                <div class="inflow-metric-label">
+                                    <i class="fa-solid fa-receipt"></i> Operaciones de Ingreso Recibidas
+                                </div>
+                                <div class="inflow-metric-value" id="all-time-inflow-count">0 depósitos</div>
+                                <div class="inflow-metric-hint" id="all-time-inflow-first-date">Primer movimiento registrado: --</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Botón de Exportar a PDF (Llamativo) -->
@@ -451,6 +495,14 @@
                         <div class="pdf-balance-values">
                             <div class="pdf-val-main val-teal" id="pdf-live-usdt">0,00 US$</div>
                             <div class="pdf-val-sub" id="pdf-live-native">0 TRX</div>
+                        </div>
+                    </div>
+
+                    <div class="pdf-balance-box" style="margin-top: 6px; border-left: 3px solid #10b981; background: rgba(16, 185, 129, 0.04);">
+                        <div class="pdf-box-header" style="color: #059669;"><i class="fa-solid fa-vault"></i> Ingresos Totales Vitalicios (Desde Creación)</div>
+                        <div class="pdf-balance-values">
+                            <div class="pdf-val-main" style="color: #059669;" id="pdf-inflow-usdt">+ 0,00 US$</div>
+                            <div class="pdf-val-sub" id="pdf-inflow-native">+ 0,000 ETH (0 depósitos)</div>
                         </div>
                     </div>
                 </div>

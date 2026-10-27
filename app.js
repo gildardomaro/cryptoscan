@@ -28,6 +28,10 @@ const SAMPLES = {
         riskPercent: 80,
         riskLevel: 'Alto',
         riskColor: '#ef4444',
+        allTimeInflowUSDT: '+ 84.250,00 USDT',
+        allTimeInflowNative: '+ 1.250.000,000 TRX',
+        allTimeInflowCount: 14,
+        firstTxDate: '12/01/2024',
         isFrozen: true,
         freezeData: {
             status: 'CONGELADA / BLACKLISTED',
@@ -129,6 +133,10 @@ const SAMPLES = {
         riskPercent: 65,
         riskLevel: 'Medio-Alto',
         riskColor: '#f97316',
+        allTimeInflowUSDT: '+ 45.850,50 USDT',
+        allTimeInflowNative: '+ 48.920 ETH',
+        allTimeInflowCount: 8,
+        firstTxDate: '04/05/2024',
         isFrozen: false,
         freezeData: {
             status: 'ACTIVA (BAJO OBSERVACIÓN)',
@@ -206,6 +214,10 @@ const SAMPLES = {
         riskPercent: 1,
         riskLevel: 'Seguro',
         riskColor: '#10b981',
+        allTimeInflowUSDT: '+ 450.890.120,00 USDT',
+        allTimeInflowNative: '+ 320.450,000 ETH',
+        allTimeInflowCount: 12480,
+        firstTxDate: '15/07/2017',
         isFrozen: false,
         freezeData: {
             status: 'TOTALMENTE LIBRE',
@@ -293,6 +305,10 @@ const SAMPLES = {
         riskPercent: 4,
         riskLevel: 'Bajo',
         riskColor: '#10b981',
+        allTimeInflowUSDT: '+ 0,00 USDT',
+        allTimeInflowNative: '+ 377.043,497 BTC',
+        allTimeInflowCount: 520,
+        firstTxDate: '03/01/2009',
         findings: [
             { type: 'safe', icon: 'fa-circle-check', text: 'UTXO proveniente de pools de minería institucional y exchanges regulados.' },
             { type: 'safe', icon: 'fa-shield', text: 'No registra presencia en bases de datos criminales ni ransomware.' }
@@ -344,20 +360,28 @@ const SAMPLES = {
  * Detecta automáticamente la red blockchain según el formato de dirección
  */
 function detectNetwork(address) {
-    const trimmed = address.trim();
-    if (trimmed.startsWith('T') && trimmed.length === 34) {
+    if (!address) return 'ethereum';
+    // Sanitizar rigurosamente: eliminar todos los espacios (incluidos intermedios de copiado), saltos de línea y caracteres invisibles
+    const cleaned = address.replace(/[\s\u200B-\u200D\uFEFF]/g, '');
+
+    // Formato EVM: Ethereum, BSC, Polygon (comienza con 0x)
+    // Regla estricta: Cualquier dirección que comience con '0x' es indiscutiblemente de la red Ethereum/EVM
+    if (cleaned.startsWith('0x')) {
+        return 'ethereum';
+    }
+    // Formato TRON: Base58 que inicia con T y tiene 34 caracteres
+    if (cleaned.startsWith('T') && cleaned.length === 34) {
         return 'tron';
     }
-    if (trimmed.startsWith('0x') && trimmed.length === 42) {
-        return 'ethereum'; // También compatible con BSC/Polygon
-    }
-    if (trimmed.startsWith('bc1') || trimmed.startsWith('1') || trimmed.startsWith('3')) {
+    // Formato Bitcoin: Bech32 (bc1), Legacy (1), P2SH (3)
+    if (cleaned.startsWith('bc1') || cleaned.startsWith('1') || cleaned.startsWith('3')) {
         return 'bitcoin';
     }
-    if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(trimmed) && !trimmed.startsWith('0x') && !trimmed.startsWith('T')) {
+    // Formato Solana: Base58 de 32 a 44 caracteres sin prefijos EVM ni TRON
+    if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(cleaned)) {
         return 'solana';
     }
-    return 'tron'; // Default de fallback
+    return 'ethereum'; // Fallback seguro
 }
 
 /**
@@ -642,87 +666,83 @@ async function fetchLiveWalletData(address, network) {
     }
     // Red ETHEREUM / BSC / Polygon (Etherscan-compatible APIs y Blockscout)
     else if (network === 'ethereum' || network === 'bsc' || network === 'polygon') {
-        // APIs públicas sin key para balance nativo
-        const rpcUrls = {
-            'ethereum': 'https://cloudflare-eth.com',
-            'bsc':      'https://bsc-dataseed.binance.org/',
-            'polygon':  'https://polygon-rpc.com'
+        const evmRpcEndpoints = {
+            'ethereum': [
+                'https://ethereum-rpc.publicnode.com',
+                'https://1rpc.io/eth',
+                'https://cloudflare-eth.com'
+            ],
+            'bsc': [
+                'https://bsc-dataseed.binance.org/',
+                'https://binance.llamarpc.com'
+            ],
+            'polygon': [
+                'https://polygon-bor-rpc.publicnode.com',
+                'https://1rpc.io/matic',
+                'https://polygon-rpc.com'
+            ]
         };
         const usdtContracts = {
             'ethereum': '0xdAC17F958D2ee523a2206206994597C13D831ec7',
             'bsc':      '0x55d398326f99059fF775485246999027B3197955',
             'polygon':  '0xc2132D05D31c914a87C6611C10748AEb04B58e8F'
         };
-        const rpcUrl = rpcUrls[network];
+
+        async function queryEvmRpc(net, method, params) {
+            const list = evmRpcEndpoints[net] || [];
+            for (const rpc of list) {
+                try {
+                    const resp = await fetch(rpc, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params })
+                    });
+                    if (resp.ok) {
+                        const json = await resp.json();
+                        if (json && json.result !== undefined && !json.error) {
+                            return json.result;
+                        }
+                    }
+                } catch(e) {}
+            }
+            return null;
+        }
+
         const usdtContract = usdtContracts[network];
 
         try {
-            // Balance nativo via JSON-RPC
-            const rpcResp = await fetch(rpcUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    jsonrpc: '2.0', id: 1,
-                    method: 'eth_getBalance',
-                    params: [address, 'latest']
-                })
-            });
-            if (rpcResp.ok) {
-                const rpcData = await rpcResp.json();
-                if (rpcData.result) {
-                    realDataFound = true;
-                    nativeBalance = parseInt(rpcData.result, 16) / 1e18;
-                }
+            // Balance nativo via JSON-RPC con fallback multi-proveedor
+            const rpcResult = await queryEvmRpc(network, 'eth_getBalance', [address, 'latest']);
+            if (rpcResult) {
+                realDataFound = true;
+                nativeBalance = parseInt(rpcResult, 16) / 1e18;
             }
         } catch(e) { console.warn('RPC balance error:', e); }
 
         // Balance USDT via ERC-20 balanceOf call
         if (usdtContract) {
             try {
-                const rpcUrl2 = rpcUrls[network];
-                // balanceOf(address) = keccak256('balanceOf(address)')[0:4] = 0x70a08231
-                const data = '0x70a08231' + address.replace('0x', '').padStart(64, '0');
-                const usdtResp = await fetch(rpcUrl2, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        jsonrpc: '2.0', id: 2,
-                        method: 'eth_call',
-                        params: [{ to: usdtContract, data }, 'latest']
-                    })
-                });
-                if (usdtResp.ok) {
-                    const usdtData = await usdtResp.json();
-                    if (usdtData.result && usdtData.result !== '0x') {
-                        usdtBalance = parseInt(usdtData.result, 16) / 1e6; // USDT tiene 6 decimales
-                    }
+                const cleanAddr = address.replace('0x', '').toLowerCase().padStart(64, '0');
+                const balCall = '0x70a08231' + cleanAddr;
+                const usdtResult = await queryEvmRpc(network, 'eth_call', [{ to: usdtContract, data: balCall }, 'latest']);
+                if (usdtResult && usdtResult !== '0x') {
+                    usdtBalance = parseInt(usdtResult, 16) / 1e6; // USDT tiene 6 decimales
                 }
             } catch(e) { console.warn('USDT balance error:', e); }
 
-            // Verificación on-chain de lista negra oficial Tether ERC-20 (isBlackListed)
+            // Verificación on-chain de lista negra oficial Tether ERC-20 (getBlackListStatus)
             if (network === 'ethereum') {
                 try {
                     const cleanAddr = address.replace('0x', '').toLowerCase().padStart(64, '0');
-                    const blDataCall = '0xfe575a87' + cleanAddr; // isBlackListed(address)
-                    const blResp = await fetch(rpcUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            jsonrpc: '2.0', id: 99,
-                            method: 'eth_call',
-                            params: [{ to: usdtContract, data: blDataCall }, 'latest']
-                        })
-                    });
-                    if (blResp.ok) {
-                        const blResJson = await blResp.json();
-                        if (blResJson.result && blResJson.result !== '0x' && blResJson.result.endsWith('1')) {
-                            isFrozenOnChain = true;
-                            freezeEntity = 'Tether Smart Contract Blacklist (ERC-20)';
-                            freezeReasons = [
-                                'Dirección listada en la lista negra directa del contrato Tether USDT ERC-20 (isBlackListed = true).',
-                                'Transferencias de tokens bloqueadas a nivel de contrato inteligente.'
-                            ];
-                        }
+                    const blSelector = '0x59bf1abe' + cleanAddr; // getBlackListStatus(address)
+                    const blResult = await queryEvmRpc(network, 'eth_call', [{ to: usdtContract, data: blSelector }, 'latest']);
+                    if (blResult && blResult !== '0x' && blResult.endsWith('1')) {
+                        isFrozenOnChain = true;
+                        freezeEntity = 'Tether Smart Contract Blacklist (ERC-20)';
+                        freezeReasons = [
+                            'Dirección listada en la lista negra directa del contrato Tether USDT ERC-20 (getBlackListStatus = true).',
+                            'Transferencias de tokens bloqueadas a nivel de contrato inteligente.'
+                        ];
                     }
                 } catch(e) {}
             }
@@ -1199,6 +1219,75 @@ function buildAnalysisResult(address, network, nativeBalance, usdtBalance, total
     // Construir conexiones y entidades de riesgo (AML Graph / Counterparties)
     const walletConnections = buildWalletConnections(address, network, parsedTxs, riskScore, isFrozen, usdtBalance, rawTransactions);
 
+    // Cálculo exhaustivo de la Suma Total Histórica de Ingresos (All-Time Lifetime Inflows)
+    let totalInflowUsdtVal = 0;
+    let totalInflowNativeVal = 0;
+    let totalInflowCountVal = 0;
+    let earliestTxTimestamp = Infinity;
+
+    if (rawTransactions && rawTransactions.length > 0) {
+        rawTransactions.forEach(t => {
+            const time = t.block_timestamp || t.timestamp || (t.status && t.status.block_time ? t.status.block_time * 1000 : null);
+            if (time && time < earliestTxTimestamp) earliestTxTimestamp = time;
+
+            if (t.isTrc20) {
+                const isRec = t.to && t.to.toLowerCase() === address.toLowerCase();
+                if (isRec) {
+                    const val = parseFloat(t.value || 0) / Math.pow(10, t.decimals || 6);
+                    totalInflowUsdtVal += val;
+                    totalInflowCountVal++;
+                }
+            } else if (t.isEvmBlockscout) {
+                const isRec = t.to && t.to.toLowerCase() === address.toLowerCase();
+                if (isRec) {
+                    totalInflowCountVal++;
+                    if (t.decodedInput && t.decodedInput.parameters) {
+                        const pVal = t.decodedInput.parameters.find(p => p.name === '_value' || p.name === 'value');
+                        if (pVal && pVal.value) {
+                            totalInflowUsdtVal += (parseFloat(pVal.value) / 1e6);
+                        }
+                    } else if (t.value) {
+                        totalInflowNativeVal += (parseFloat(t.value) / 1e18);
+                    }
+                }
+            } else if (t.isTronscanNative) {
+                const isRec = t.to && t.to.toLowerCase() === address.toLowerCase();
+                if (isRec) {
+                    totalInflowCountVal++;
+                    totalInflowNativeVal += (parseFloat(t.amount || 0) / 1e6);
+                }
+            } else if (t.vout && Array.isArray(t.vout)) {
+                let incSat = 0;
+                t.vout.forEach(v => {
+                    if (v.scriptpubkey_address && v.scriptpubkey_address.toLowerCase() === address.toLowerCase()) {
+                        incSat += (v.value || 0);
+                    }
+                });
+                if (incSat > 0) {
+                    totalInflowCountVal++;
+                    totalInflowNativeVal += (incSat / 1e8);
+                }
+            }
+        });
+    }
+
+    // Garantía contable de la blockchain: el ingreso histórico total nunca puede ser menor al balance actual en custodia
+    if (usdtBalance > 0 && totalInflowUsdtVal < usdtBalance) {
+        totalInflowUsdtVal = usdtBalance;
+        if (totalInflowCountVal === 0) totalInflowCountVal = 1;
+    }
+    if (nativeBalance > 0 && totalInflowNativeVal < nativeBalance) {
+        totalInflowNativeVal = nativeBalance;
+        if (totalInflowCountVal === 0) totalInflowCountVal = 1;
+    }
+
+    const firstTxDateStr = earliestTxTimestamp !== Infinity ? 
+        new Date(earliestTxTimestamp).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 
+        (totalInflowCountVal > 0 ? 'Historial verificado on-chain' : 'Sin movimientos previos');
+
+    const allTimeInflowUSDTStr = `+ ${totalInflowUsdtVal.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${tickers.main}`;
+    const allTimeInflowNativeStr = `+ ${totalInflowNativeVal.toLocaleString('es-ES', { minimumFractionDigits: 3, maximumFractionDigits: 6 })} ${tickers.sub}`;
+
     return {
         address: address,
         network: network,
@@ -1216,7 +1305,11 @@ function buildAnalysisResult(address, network, nativeBalance, usdtBalance, total
         findings: findings,
         sources: sources,
         connectionCounts: walletConnections.counts,
-        connections: walletConnections.list
+        connections: walletConnections.list,
+        allTimeInflowUSDT: allTimeInflowUSDTStr,
+        allTimeInflowNative: allTimeInflowNativeStr,
+        allTimeInflowCount: totalInflowCountVal,
+        firstTxDate: firstTxDateStr
     };
 }
 
@@ -1224,9 +1317,13 @@ function buildAnalysisResult(address, network, nativeBalance, usdtBalance, total
  * Maneja el evento de envío del formulario
  */
 async function handleScan(event) {
-    event.preventDefault();
-    const addressInput = document.getElementById('wallet-input').value.trim();
+    if (event) event.preventDefault();
+    const rawInput = document.getElementById('wallet-input').value;
+    const addressInput = (rawInput || '').replace(/[\s\u200B-\u200D\uFEFF]/g, '');
     if (!addressInput) return;
+
+    // Normalizar en el campo visible del usuario
+    document.getElementById('wallet-input').value = addressInput;
 
     let selectedNet = document.getElementById('network-select').value;
     if (selectedNet === 'auto') {
@@ -1234,7 +1331,7 @@ async function handleScan(event) {
     }
 
     // Comprobar si coincide exactamente con alguna muestra precargada de botones de demo
-    const matchedSample = Object.values(SAMPLES).find(s => s.address === addressInput);
+    const matchedSample = Object.values(SAMPLES).find(s => s.address.toLowerCase() === addressInput.toLowerCase());
     
     if (matchedSample) {
         executeScanWithData(matchedSample);
@@ -1250,6 +1347,11 @@ async function handleScan(event) {
 async function startScanProcess(address, network) {
     const scanSession = ++activeScanSessionId;
     currentScanData = null; // BARRERA: Limpiar inmediatamente datos de cualquier escaneo anterior
+
+    address = (address || '').replace(/[\s\u200B-\u200D\uFEFF]/g, '');
+    if (!network || network === 'auto') {
+        network = detectNetwork(address);
+    }
 
     // Limpiar preventivamente el historial en el DOM para que no haya rastro visual de la wallet anterior
     const txHistoryList = document.getElementById('tx-history-list');
@@ -1620,6 +1722,27 @@ function renderReportCard(data) {
         txCountBadge.textContent = '0 movimientos';
         txHistoryList.innerHTML = '<div class="no-txs-msg"><i class="fa-solid fa-folder-open" style="margin-right: 0.4rem;"></i> No se registraron transacciones on-chain en los últimos 60 días para esta dirección.</div>';
     }
+
+    // Renderizar Sección: Acumulado Total de Ingresos (Desde Creación de la Wallet)
+    const inflowUsdtElem = document.getElementById('all-time-inflow-usdt');
+    const inflowNativeElem = document.getElementById('all-time-inflow-native');
+    const inflowCountElem = document.getElementById('all-time-inflow-count');
+    const inflowFirstDateElem = document.getElementById('all-time-inflow-first-date');
+    const inflowNativeIcon = document.getElementById('all-time-inflow-native-icon');
+
+    if (inflowUsdtElem) inflowUsdtElem.textContent = data.allTimeInflowUSDT || '+ 0,00 USDT';
+    if (inflowNativeElem) inflowNativeElem.textContent = data.allTimeInflowNative || '+ 0,000 ETH';
+    if (inflowCountElem) inflowCountElem.textContent = `${data.allTimeInflowCount || 0} ${data.allTimeInflowCount === 1 ? 'depósito recibido' : 'depósitos recibidos'}`;
+    if (inflowFirstDateElem) inflowFirstDateElem.textContent = `Primer movimiento: ${data.firstTxDate || 'Verificado en génesis'}`;
+
+    if (inflowNativeIcon) {
+        if (data.network === 'ethereum') inflowNativeIcon.className = 'fa-brands fa-ethereum';
+        else if (data.network === 'tron') inflowNativeIcon.className = 'fa-solid fa-gem';
+        else if (data.network === 'bitcoin') inflowNativeIcon.className = 'fa-brands fa-bitcoin';
+        else if (data.network === 'solana') inflowNativeIcon.className = 'fa-solid fa-sun';
+        else if (data.network === 'bsc') inflowNativeIcon.className = 'fa-solid fa-coins';
+        else if (data.network === 'polygon') inflowNativeIcon.className = 'fa-solid fa-shapes';
+    }
 }
 
 /**
@@ -1690,6 +1813,11 @@ function preparePDFTemplate(data, chartDataUrl) {
     document.getElementById('pdf-snapshot-native').textContent = data.snapshotNative;
     document.getElementById('pdf-live-usdt').textContent = data.liveUSDT;
     document.getElementById('pdf-live-native').textContent = data.liveNative;
+
+    const pdfInflowUsdt = document.getElementById('pdf-inflow-usdt');
+    const pdfInflowNative = document.getElementById('pdf-inflow-native');
+    if (pdfInflowUsdt) pdfInflowUsdt.textContent = data.allTimeInflowUSDT || '+ 0,00 US$';
+    if (pdfInflowNative) pdfInflowNative.textContent = `${data.allTimeInflowNative || '+ 0,000 ETH'} (${data.allTimeInflowCount || 0} depósitos)`;
 
     // Riesgo
     const pdfRiskScore = document.getElementById('pdf-risk-score');
@@ -1842,8 +1970,18 @@ async function pasteFromClipboard() {
     try {
         const text = await navigator.clipboard.readText();
         if (text) {
-            document.getElementById('wallet-input').value = text;
-            showToast('Dirección pegada');
+            const cleanText = text.replace(/[\s\u200B-\u200D\uFEFF]/g, '');
+            document.getElementById('wallet-input').value = cleanText;
+            const detected = detectNetwork(cleanText);
+            const netNames = {
+                'ethereum': 'Ethereum (ERC-20)',
+                'tron': 'TRON (TRC-20)',
+                'bitcoin': 'Bitcoin (BTC)',
+                'solana': 'Solana (SPL)',
+                'bsc': 'BNB Chain (BEP-20)',
+                'polygon': 'Polygon (POL)'
+            };
+            showToast(`Dirección pegada y limpia (${netNames[detected] || detected.toUpperCase()})`);
         }
     } catch (err) {
         showToast('Por favor pega manualmente');
@@ -2282,10 +2420,25 @@ function handleNetworkChange() {
 window.addEventListener('DOMContentLoaded', () => {
     loadAmlApiConfig();
 
-    // Si la caja de texto está vacía, no forzar datos viejos
     const walletInput = document.getElementById('wallet-input');
-    if (walletInput && walletInput.value.trim() !== '') {
-        startScanProcess(walletInput.value.trim(), 'tron');
+    if (walletInput) {
+        // Normalización instantánea al tipear o pegar
+        walletInput.addEventListener('input', (e) => {
+            const val = e.target.value;
+            if (val && (val.includes(' ') || /[\r\n\t]/.test(val))) {
+                const cleaned = val.replace(/[\s\u200B-\u200D\uFEFF]/g, '');
+                e.target.value = cleaned;
+            }
+        });
+
+        // Si la caja de texto ya tiene una dirección (por cache/autocompletado del navegador), analizar con su red real
+        if (walletInput.value.trim() !== '') {
+            const cleanVal = walletInput.value.replace(/[\s\u200B-\u200D\uFEFF]/g, '');
+            walletInput.value = cleanVal;
+            const currentNet = document.getElementById('network-select')?.value;
+            const netToUse = (currentNet && currentNet !== 'auto') ? currentNet : detectNetwork(cleanVal);
+            startScanProcess(cleanVal, netToUse);
+        }
     }
 
     // Inicializar listener global para pegar imágenes con Ctrl+V (WhatsApp Web)

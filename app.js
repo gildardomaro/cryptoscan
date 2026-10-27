@@ -9,7 +9,7 @@ let activeScanSessionId = 0; // Barrera contra condiciones de carrera entre esca
 /**
  * fetch con AbortController y timeout para redes móviles (3G/4G/5G) y conexiones inestables
  */
-async function fetchWithTimeout(url, options = {}, timeoutMs = 3500) {
+async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -556,7 +556,7 @@ async function fetchLiveWalletData(address, network) {
             try {
                 const resp = await fetchWithTimeout(endpoint, {
                     headers: { 'Accept': 'application/json' }
-                }, 3500);
+                }, 8000);
                 if (resp.ok) {
                     const resJson = await resp.json();
                     if (resJson.data && resJson.data.length > 0) {
@@ -600,7 +600,7 @@ async function fetchLiveWalletData(address, network) {
                         parameter: param,
                         owner_address: owner
                     })
-                }, 3500);
+                }, 8000);
                 if (balResp.ok) {
                     const balData = await balResp.json();
                     if (balData.constant_result && balData.constant_result.length > 0) {
@@ -623,7 +623,7 @@ async function fetchLiveWalletData(address, network) {
         // Consultar transacciones TRC-20 (USDT / USDC) y nativas TRX
         // Estrategia Multi-Endpoint: 1° Tronscan API (abierta y sin problemas de CORS) -> 2° TronGrid API oficial
         try {
-            const tsTrc20Resp = await fetchWithTimeout(`https://apilist.tronscanapi.com/api/token_trc20/transfers?limit=25&start=0&sort=-timestamp&count=true&relatedAddress=${address}`, {}, 3500);
+            const tsTrc20Resp = await fetchWithTimeout(`https://apilist.tronscanapi.com/api/token_trc20/transfers?limit=25&start=0&sort=-timestamp&count=true&relatedAddress=${address}`, {}, 8000);
             if (tsTrc20Resp.ok) {
                 const tsTrc20Json = await tsTrc20Resp.json();
                 if (tsTrc20Json.token_transfers && Array.isArray(tsTrc20Json.token_transfers)) {
@@ -649,7 +649,7 @@ async function fetchLiveWalletData(address, network) {
         // Si no hubo transferencias TRC-20, consultar transacciones nativas TRX en Tronscan
         if (rawTransactions.length === 0) {
             try {
-                const tsTxResp = await fetchWithTimeout(`https://apilist.tronscanapi.com/api/transaction?sort=-timestamp&count=true&limit=25&start=0&address=${address}`, {}, 3500);
+                const tsTxResp = await fetchWithTimeout(`https://apilist.tronscanapi.com/api/transaction?sort=-timestamp&count=true&limit=25&start=0&address=${address}`, {}, 8000);
                 if (tsTxResp.ok) {
                     const tsTxJson = await tsTxResp.json();
                     if (tsTxJson.data && Array.isArray(tsTxJson.data)) {
@@ -679,7 +679,7 @@ async function fetchLiveWalletData(address, network) {
                 const trc20Resp = await fetchWithTimeout(
                     `https://api.trongrid.io/v1/accounts/${address}/transactions/trc20?limit=25`,
                     { headers: { 'Accept': 'application/json' } },
-                    3500
+                    8000
                 );
                 if (trc20Resp.ok) {
                     const trc20Json = await trc20Resp.json();
@@ -707,7 +707,7 @@ async function fetchLiveWalletData(address, network) {
                 const txResp = await fetchWithTimeout(
                     `https://api.trongrid.io/v1/accounts/${address}/transactions?limit=25`,
                     { headers: { 'Accept': 'application/json' } },
-                    3500
+                    8000
                 );
                 if (txResp.ok) {
                     const txJson = await txResp.json();
@@ -755,7 +755,7 @@ async function fetchLiveWalletData(address, network) {
                         parameter: param,
                         owner_address: owner
                     })
-                }, 3500);
+                }, 8000);
                 if (blResp.ok) {
                     const blData = await blResp.json();
                     if (blData.constant_result && blData.constant_result.length > 0) {
@@ -808,7 +808,7 @@ async function fetchLiveWalletData(address, network) {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params })
-                    }, 3500);
+                    }, 8000);
                     if (resp.ok) {
                         const json = await resp.json();
                         if (json && json.result !== undefined && !json.error) {
@@ -869,7 +869,7 @@ async function fetchLiveWalletData(address, network) {
             };
             const bsBase = blockscoutEndpoints[network];
             if (bsBase) {
-                const bsTxResp = await fetchWithTimeout(`${bsBase}/api/v2/addresses/${address}/transactions`, {}, 3500);
+                const bsTxResp = await fetchWithTimeout(`${bsBase}/api/v2/addresses/${address}/transactions`, {}, 8000);
                 if (bsTxResp.ok) {
                     const bsTxJson = await bsTxResp.json();
                     if (bsTxJson.items && Array.isArray(bsTxJson.items)) {
@@ -895,7 +895,7 @@ async function fetchLiveWalletData(address, network) {
     // Red BITCOIN (Blockstream API)
     else if (network === 'bitcoin') {
         try {
-            const btcResp = await fetchWithTimeout(`https://blockstream.info/api/address/${address}`, {}, 3500);
+            const btcResp = await fetchWithTimeout(`https://blockstream.info/api/address/${address}`, {}, 8000);
             if (btcResp.ok) {
                 const btcData = await btcResp.json();
                 realDataFound = true;
@@ -904,7 +904,7 @@ async function fetchLiveWalletData(address, network) {
                 nativeBalance = (funded - spent) / 100000000; // 1 BTC = 10^8 satoshis
                 totalTxs = btcData.chain_stats.tx_count || 0;
             }
-            const btcTxResp = await fetchWithTimeout(`https://blockstream.info/api/address/${address}/txs`, {}, 3500);
+            const btcTxResp = await fetchWithTimeout(`https://blockstream.info/api/address/${address}/txs`, {}, 8000);
             if (btcTxResp.ok) {
                 rawTransactions = await btcTxResp.json();
                 totalTxs = rawTransactions.length;
@@ -922,7 +922,7 @@ async function fetchLiveWalletData(address, network) {
                     method: 'getBalance',
                     params: [address]
                 })
-            }, 3500);
+            }, 8000);
             if (solResp.ok) {
                 const solData = await solResp.json();
                 if (solData.result !== undefined) {
@@ -1506,7 +1506,7 @@ async function startScanProcess(address, network) {
             setTimeout(() => {
                 console.warn('[Network] Tiempo de espera en red móvil alcanzado, generando reporte de contingencia...');
                 resolve(generateFallbackReport(address, network));
-            }, 8000);
+            }, 16000);
         });
         scanResult = await Promise.race([liveDataPromise, timeoutPromise]);
     } catch (scanErr) {

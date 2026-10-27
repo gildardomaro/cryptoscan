@@ -5,19 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CryptoGuard AML Scanner | Escáner Forense Multi-Blockchain</title>
     <meta name="description" content="Escáner y auditoría de riesgo AML para billeteras de Bitcoin, Ethereum, TRON, Solana, BNB y Polygon.">
-    <!-- Google Fonts -->
+    <!-- Preconexión DNS y optimización para redes móviles 4G/5G y sin Wi-Fi -->
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Google Fonts no bloqueante -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"></noscript>
+
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- html2pdf.js para exportación directa a PDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <!-- jsQR para lectura y decodificación de códigos QR desde imágenes/fotos -->
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-    <link rel="stylesheet" href="styles.css?v=2.5">
+
+    <!-- Estilos Principales -->
+    <link rel="stylesheet" href="styles.css?v=2.6">
+
+    <!-- Librerías de soporte cargadas con defer (NUNCA bloquean la renderización inicial del explorador) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js" defer></script>
 </head>
 <body>
     <div class="app-background">
@@ -816,6 +824,6 @@
     <!-- Notificación Toast -->
     <div id="toast" class="toast">Mensaje copiado</div>
 
-    <script src="app.js?v=2.5"></script>
+    <script src="app.js?v=2.6" defer></script>
 </body>
 </html>

@@ -1,10 +1,10 @@
 // CryptoGuard AML Scanner Service Worker (Optimización para redes móviles y sin Wi-Fi)
-const CACHE_NAME = 'cryptoscan-cache-v2.6';
+const CACHE_NAME = 'cryptoscan-cache-v2.7';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './styles.css?v=2.6',
-  './app.js?v=2.6'
+  './styles.css?v=2.7',
+  './app.js?v=2.7'
 ];
 
 self.addEventListener('install', (event) => {
